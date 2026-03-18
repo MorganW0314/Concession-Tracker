@@ -305,8 +305,14 @@ def group_scoops_by_flavor(rows):
     for item_name, data in rows.items():
         name_lower = item_name.lower()
 
-        # Only count ice cream scoops
-        if "scoop" not in name_lower:
+         # Check if this item is in TOFTS_ICE_CREAM (handles base + variants)
+        is_tofts_ice_cream = False
+        for tofts_flavor in TOFTS_ICE_CREAM:
+            if normalize_flavor(item_name) == normalize_flavor(tofts_flavor):
+                is_tofts_ice_cream = True
+                break
+        
+        if not is_tofts_ice_cream:
             continue
 
         # Extract sales from the row dict
@@ -315,11 +321,21 @@ def group_scoops_by_flavor(rows):
             continue
 
         flavor = normalize_flavor(item_name)
+        
+        # Count scoops: determine multiplier based on scoop type
+        if "triple scoop" in name_lower:
+            scoops = quantity * 3
+        elif "double scoop" in name_lower or "double" in name_lower:
+            scoops = quantity * 2
+        elif "single scoop" in name_lower:
+            scoops = quantity * 1
+        else:
+            scoops = quantity * 1  # Base flavor defaults to 1 scoop
 
         if flavor not in flavor_totals:
             flavor_totals[flavor] = 0
 
-        flavor_totals[flavor] += quantity
+        flavor_totals[flavor] += scoops
 
     return flavor_totals
 
@@ -715,10 +731,22 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
     tubs_used = tubs_used_from_scoops(flavor_totals)
 
     for flavor, scoops in flavor_totals.items():
-        if flavor in rows:
-            rows[flavor]["scoops_used"] = scoops
-            rows[flavor]["tubs_used"] = tubs_used.get(flavor, 0)
-
+        # Find the actual item name in rows that matches this flavor
+        for item_name in list(rows.keys()):
+            if normalize_flavor(item_name) == flavor:
+                rows[item_name]["scoops_used"] = scoops
+                rows[item_name]["tubs_used"] = tubs_used.get(flavor, 0)
+                break
+    # DEBUG: Check what's in rows for ice cream items
+    print("\n" + "="*50)
+    print("ICE CREAM ITEMS IN ROWS DICT:")
+    print("="*50)
+    for item in TOFTS_ICE_CREAM:
+        if item in rows:
+            print(f"  {item}: sales={rows[item].get('sales', 0)}, scoops_used={rows[item].get('scoops_used', 0)}")
+        else:
+            print(f"  {item}: NOT IN ROWS")
+    print("="*50 + "\n")
 # ------------------------------------------------------------
 # FIND PREVIOUS WEEK'S SHEET
 # ------------------------------------------------------------
