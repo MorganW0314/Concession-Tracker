@@ -67,5 +67,22 @@ def take_items(csv_path):
                 }
 
             rows[item]["sales"] += net_sales
+            
+    # DEBUG: Print what was actually loaded from CSV
+    print("\n" + "="*50)
+    print("ITEMS LOADED FROM CSV:")
+    print("="*50)
+    for item_name, item_data in rows.items():
+         print(f"  {item_name}: sales={item_data['sales']}")
+    print("="*50 + "\n")
 
     return rows
+# TEST: Call the function and see output
+if __name__ == "__main__":
+    rows = take_items("purchases.csv")  # or whatever your CSV filename is
+    print("Done!")
+    print("\n====================")
+    print("FLAVOR KEYS FOUND:")
+    for k in rows.keys():
+        print(f"• {repr(k)}")
+    print("====================\n")

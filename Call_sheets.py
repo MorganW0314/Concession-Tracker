@@ -754,7 +754,10 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
     {item: rows[item].get("sales", 0) for item in rows},
     {item: rows[item].get("spoilage", 0) for item in rows},
 )
-
+    print("Items in rows dict:", list(rows.keys()))
+    print("Expected items from CATEGORY_ORDER:", 
+          
+      [item for cat, items in CATEGORY_ORDER for item in items])
     for item in rows:
         rows[item]["expected"] = expected_totals.get(item, 0)
 
