@@ -595,6 +595,11 @@ def read_last_week_inventory(service, spreadsheet_id, previous_sheet_name):
             ending[item] = expected
         else:
             ending[item] = 0
+        
+        # ADD THIS: Also add normalized key for matching
+        normalized = normalize_flavor(item)
+        if normalized != item:
+            ending[normalized] = ending[item]
 
     return ending
 
