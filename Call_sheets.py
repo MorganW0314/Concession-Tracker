@@ -682,6 +682,12 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
                     "actual": "",
                     "variance": ""
                 }
+                 # ADD THIS: Also add normalized flavor key
+                normalized = normalize_flavor(item)
+                if normalized not in rows:
+                    rows[normalized] = rows[item]
+
+
     values = service.spreadsheets().values().get(
         spreadsheetId=spreadsheet_id,
         range=f"{sheet_name}!A1:K300"
@@ -694,6 +700,13 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
     # ICE CREAM SCOOP + TUBS LOGIC (NEW)
     # ------------------------------------------------------------
     flavor_totals = group_scoops_by_flavor(rows)
+    # DEBUG: See what flavors were found and their totals
+    print("\n" + "="*50)
+    print("FLAVOR TOTALS FROM SCOOPS:")
+    print("="*50)
+    for flavor, scoops in flavor_totals.items():
+         print(f"  {flavor}: {scoops} scoops")
+    print("="*50 + "\n")
     tubs_used = tubs_used_from_scoops(flavor_totals)
 
     for flavor, scoops in flavor_totals.items():
