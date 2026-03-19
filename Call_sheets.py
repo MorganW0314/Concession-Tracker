@@ -725,18 +725,31 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
     print("\n" + "="*50)
     print("FLAVOR TOTALS FROM SCOOPS:")
     print("="*50)
-    for flavor, scoops in flavor_totals.items():
-         print(f"  {flavor}: {scoops} scoops")
     print("="*50 + "\n")
     tubs_used = tubs_used_from_scoops(flavor_totals)
 
     for flavor, scoops in flavor_totals.items():
         # Find the actual item name in rows that matches this flavor
-        for item_name in list(rows.keys()):
-            if normalize_flavor(item_name) == flavor:
-                rows[item_name]["scoops_used"] = scoops
-                rows[item_name]["tubs_used"] = tubs_used.get(flavor, 0)
+        # Prioritize exact base flavor name first
+        found = False
+        
+        # First, try to find exact match in TOFTS_ICE_CREAM
+        for tofts_flavor in TOFTS_ICE_CREAM:
+            if normalize_flavor(tofts_flavor) == flavor:
+                rows[tofts_flavor]["scoops_used"] = scoops
+                rows[tofts_flavor]["tubs_used"] = tubs_used.get(flavor, 0)
+                found = True
                 break
+        
+        # If not found, search all rows
+        if not found:
+            for item_name in list(rows.keys()):
+                if normalize_flavor(item_name) == flavor:
+                    rows[item_name]["scoops_used"] = scoops
+                    rows[item_name]["tubs_used"] = tubs_used.get(flavor, 0)
+                    break
+        
+       
     # DEBUG: Check what's in rows for ice cream items
     print("\n" + "="*50)
     print("ICE CREAM ITEMS IN ROWS DICT:")
