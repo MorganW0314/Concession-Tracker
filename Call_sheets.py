@@ -760,6 +760,20 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
         else:
             print(f"  {item}: NOT IN ROWS")
     print("="*50 + "\n")
+    # ====================================================================
+    # SAME FIX FOR SALES: Consolidate variant sales to base flavors
+    # ====================================================================
+    for tofts_flavor in TOFTS_ICE_CREAM:
+        normalized = normalize_flavor(tofts_flavor)
+        total_sales = 0
+        
+        # Sum sales from all variants of this flavor
+        for item_name in list(rows.keys()):
+            if normalize_flavor(item_name) == normalized:
+                total_sales += rows[item_name].get("sales", 0)
+        
+        # Write total back to base flavor
+        rows[tofts_flavor]["sales"] = total_sales
 # ------------------------------------------------------------
 # FIND PREVIOUS WEEK'S SHEET
 # ------------------------------------------------------------
