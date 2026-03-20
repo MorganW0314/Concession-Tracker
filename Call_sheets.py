@@ -16,30 +16,27 @@ def get_sheet_id(service, spreadsheet_id, sheet_name):
             return sheet["properties"]["sheetId"]
     raise ValueError(f"Sheet name '{sheet_name}' not found.")
 
-def create_weekly_sheet(service, spreadsheet_id):
-    # 1. Generate the new tab name
+def create_weekly_sheet(service, spreadsheet_id, stand_name):
+    # 1. Generate the new tab name including stand name
     from datetime import datetime
-    new_title = datetime.today().strftime("Week of %m-%d-%Y")
+    new_title = datetime.today().strftime(f"{stand_name} - Week of %m-%d-%Y")
 
-    # 2. Duplicate the TEMPLATE tab
-    body = {
-        "requests": [
-            {
-                "duplicateSheet": {
-                    "sourceSheetId": get_sheet_id(service, spreadsheet_id, "TEST_FORMATTING"),
-                    "insertSheetIndex": 0,
-                    "newSheetName": new_title
-                }
+    # 2. Create a new blank sheet tab
+    requests = [{
+        "addSheet": {
+            "properties": {
+                "title": new_title,
+                "gridProperties": {"rowCount": 500, "columnCount": 11}
             }
-        ]
-    }
+        }
+    }]
 
     service.spreadsheets().batchUpdate(
         spreadsheetId=spreadsheet_id,
-        body=body
+        body={"requests": requests}
     ).execute()
 
-    # 3. Return the new sheet ID
+    # 3. Return the new sheet name
     return new_title
 
 
@@ -173,42 +170,110 @@ def get_values(sheet, spreadsheet_id, range_string):
 
     return result.get("values", [])
 
-def read_deliveries(sheet, spreadsheet_id):
-    """Read the Deliveries tab and return a dict of item -> quantity."""
-    rows = get_values(sheet, spreadsheet_id, "Deliveries!A2:C200")
-  # skip header row
+def read_deliveries(sheet, spreadsheet_id, stand_name):
+    """Read the Deliveries - {stand} tab and accumulate deliveries per item.
+
+    Tab format (row 1 = header, rows 2+ = data):
+      A: DATE  (optional, for record-keeping)
+      B: ITEM
+      C: PACKAGES / QUANTITY
+      D: UNITS PER PACKAGE  (optional, defaults to 1)
+
+    Quantities are ACCUMULATED so multiple deliveries in one week are summed.
+    """
+    tab = f"Deliveries - {stand_name}"
+    rows = get_values(sheet, spreadsheet_id, f"{tab}!A2:D200")
 
     deliveries = {}
 
     for row in rows:
-        if len(row) < 2:
-            continue  # skip incomplete rows
+        if len(row) < 3:
+            continue  # need at least Date, Item, Quantity
 
-        item = row[0].strip()
-        packages = int(row[1])
-        units_per_package = int(row[2]) 
+        item = row[1].strip() if len(row) > 1 else ""
+        if not item:
+            continue
 
-        total_units = packages * units_per_package
-        deliveries[item] = total_units
+        try:
+            packages = int(row[2].strip()) if row[2].strip() else 0
+        except (ValueError, IndexError):
+            packages = 0
+
+        try:
+            units_per = int(row[3].strip()) if len(row) > 3 and row[3].strip() else 1
+        except (ValueError, IndexError):
+            units_per = 1
+
+        total_units = packages * units_per
+        # ACCUMULATE so mid-week deliveries are summed, not overwritten
+        deliveries[item] = deliveries.get(item, 0) + total_units
 
     return deliveries
 
-def read_spoilage(sheet, spreadsheet_id):
-    """Read the Spoilage tab and return item -> units spoiled."""
-    rows = get_values(sheet, spreadsheet_id, "Spoilage!A2:B200")  # Item, Units Spoiled
+def read_spoilage(sheet, spreadsheet_id, stand_name):
+    """Read the Spoilage - {stand} tab and return accumulated spoilage per item.
+
+    Tab format (row 1 = header, rows 2+ = data):
+      A: DATE  (optional, for record-keeping)
+      B: ITEM
+      C: UNITS SPOILED
+
+    Quantities are ACCUMULATED across all rows for the week.
+    """
+    tab = f"Spoilage - {stand_name}"
+    rows = get_values(sheet, spreadsheet_id, f"{tab}!A2:C200")
 
     spoilage = {}
 
     for row in rows:
-        if len(row) < 2:
-            continue  # skip incomplete rows
+        if len(row) < 3:
+            continue  # need at least Date, Item, Quantity
 
-        item = row[0].strip()
-        units_spoiled = int(row[1])
+        item = row[1].strip() if len(row) > 1 else ""
+        if not item:
+            continue
 
-        spoilage[item] = units_spoiled
+        try:
+            units_spoiled = int(row[2].strip()) if row[2].strip() else 0
+        except (ValueError, IndexError):
+            units_spoiled = 0
+
+        # ACCUMULATE across all spoilage entries for the week
+        spoilage[item] = spoilage.get(item, 0) + units_spoiled
 
     return spoilage
+
+def read_master_items(sheet, spreadsheet_id, stand_name):
+    """Read the Master Items - {stand} tab and return a list of (category, item) tuples.
+
+    Tab format (row 1 = header, rows 2+ = data):
+      A: CATEGORY
+      B: ITEM
+
+    Returns a list of (category, item) tuples, or None if the tab is missing/empty.
+    This list is used to build the CATEGORY_ORDER for write_full_week so items
+    always appear even when not sold in a given week.
+    """
+    tab = f"Master Items - {stand_name}"
+    try:
+        rows = get_values(sheet, spreadsheet_id, f"{tab}!A2:B500")
+    except Exception:
+        return None  # Tab does not exist yet
+
+    if not rows:
+        return None
+
+    items = []
+    for row in rows:
+        if len(row) < 2:
+            continue
+        category = row[0].strip()
+        item = row[1].strip()
+        if category and item:
+            items.append((category, item))
+
+    return items if items else None
+
 
 def read_sales(sheet, spreadsheet_id, sheet_name):
     """
@@ -619,24 +684,25 @@ def read_last_week_inventory(service, spreadsheet_id, previous_sheet_name):
 
     return ending
 
-def find_previous_week_sheet_name(service, spreadsheet_id, current_sheet_name):
-    """Return the sheet name of the most recent weekly sheet before the current one."""
+def find_previous_week_sheet_name(service, spreadsheet_id, current_sheet_name, stand_name):
+    """Return the sheet name of the most recent weekly sheet before the current one for a stand."""
     # Get spreadsheet metadata
     metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
     sheets = metadata.get("sheets", [])
 
+    prefix = f"{stand_name} - Week of "
     weekly_sheets = []
 
     for s in sheets:
         title = s["properties"]["title"]
 
-        # Only consider sheets that start with "Week of"
-        if not title.startswith("Week of"):
+        # Only consider weekly sheets for this stand
+        if not title.startswith(prefix):
             continue
 
         # Extract date portion
         try:
-            date_str = title.replace("Week of", "").strip()
+            date_str = title[len(prefix):].strip()
             date_obj = datetime.strptime(date_str, "%m-%d-%Y")
             weekly_sheets.append((title, date_obj))
         except:
@@ -653,45 +719,50 @@ def find_previous_week_sheet_name(service, spreadsheet_id, current_sheet_name):
     return None  # No previous sheet found
 
 
-def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
+def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows, stand_name):
 
     """
-    Writes a fully formatted weekly inventory sheet with:
-    - Category grouping
-    - Header formatting
-    - Borders
-    - Auto-size
-    - Conditional formatting
+    Writes a fully formatted weekly inventory sheet for a given stand with:
+    - Category grouping (from Master Items tab or hardcoded fallback)
+    - Blue header row, light-blue category rows matching 2025 sheet design
+    - Green/red conditional formatting on Variance column
+    - Variance written as a formula so it auto-calculates when Actual is filled
     - Frozen header row
     """
 
-  # ============================
-# CATEGORY LISTS (MATCH CSV)
-# ============================
-
-    
-
     # ============================
     # CATEGORY ORDER
+    # Try to read from "Master Items - {stand}" tab first; fall back to hardcoded lists.
     # ============================
 
-    CATEGORY_ORDER = [
-        ("ICE CREAM (Toft's Scoops)", TOFTS_ICE_CREAM),
-        ("NOVELTY ICE CREAM", NOVELTY_ICE_CREAM),
-        ("CANDY", CANDY),
-        ("DRINKS", DRINKS),
-        ("MEALS", MEALS),
-        ("SNACKS", SNACKS),
-       ("SNOW CONES / SYRUPS", SNOW_CONE_AND_FOUNTAIN_SYRUPS),  # no CSV items yet
-        ("JANITORIAL / CONSUMABLES", JANITORIAL)
-    ] 
-     # ====================================================================
-    # NEW: ENSURE ALL ITEMS FROM CATEGORY_ORDER APPEAR, EVEN WITH 0 SALES
+    master_items = read_master_items(sheet, spreadsheet_id, stand_name)
+
+    if master_items:
+        from collections import OrderedDict
+        category_map = OrderedDict()
+        for category, item in master_items:
+            if category not in category_map:
+                category_map[category] = []
+            category_map[category].append(item)
+        CATEGORY_ORDER = list(category_map.items())
+    else:
+        CATEGORY_ORDER = [
+            ("ICE CREAM (Toft's Scoops)", TOFTS_ICE_CREAM),
+            ("NOVELTY ICE CREAM", NOVELTY_ICE_CREAM),
+            ("CANDY", CANDY),
+            ("DRINKS", DRINKS),
+            ("MEALS", MEALS),
+            ("SNACKS", SNACKS),
+            ("SNOW CONES / SYRUPS", SNOW_CONE_AND_FOUNTAIN_SYRUPS),
+            ("JANITORIAL / CONSUMABLES", JANITORIAL),
+        ]
+
+    # ====================================================================
+    # ENSURE ALL ITEMS FROM CATEGORY_ORDER APPEAR, EVEN WITH 0 SALES
     # ====================================================================
     for category_name, item_list in CATEGORY_ORDER:
         for item in item_list:
             if item not in rows:
-                # Add item with zero defaults if it's missing from CSV
                 rows[item] = {
                     "starting": 0,
                     "deliveries": 0,
@@ -701,199 +772,146 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
                     "tubs_used": 0,
                     "expected": 0,
                     "actual": "",
-                    "variance": ""
                 }
-                 # ADD THIS: Also add normalized flavor key
                 normalized = normalize_flavor(item)
                 if normalized not in rows:
                     rows[normalized] = rows[item]
 
-
-    values = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheet_id,
-        range=f"{sheet_name}!A1:K300"
-    ).execute().get("values", [])
-
-    row_lookup = build_ice_cream_row_lookup(sheet, spreadsheet_id, sheet_name)
-
-
     # ------------------------------------------------------------
-    # ICE CREAM SCOOP + TUBS LOGIC (NEW)
+    # ICE CREAM SCOOP + TUBS LOGIC
     # ------------------------------------------------------------
     flavor_totals = group_scoops_by_flavor(rows)
-    # DEBUG: See what flavors were found and their totals
-    print("\n" + "="*50)
-    print("FLAVOR TOTALS FROM SCOOPS:")
-    print("="*50)
-    print("="*50 + "\n")
     tubs_used = tubs_used_from_scoops(flavor_totals)
 
     for flavor, scoops in flavor_totals.items():
-        # Find the actual item name in rows that matches this flavor
-        # Prioritize exact base flavor name first
         found = False
-        
-        # First, try to find exact match in TOFTS_ICE_CREAM
         for tofts_flavor in TOFTS_ICE_CREAM:
             if normalize_flavor(tofts_flavor) == flavor:
                 rows[tofts_flavor]["scoops_used"] = scoops
                 rows[tofts_flavor]["tubs_used"] = tubs_used.get(flavor, 0)
                 found = True
                 break
-        
-        # If not found, search all rows
         if not found:
             for item_name in list(rows.keys()):
                 if normalize_flavor(item_name) == flavor:
                     rows[item_name]["scoops_used"] = scoops
                     rows[item_name]["tubs_used"] = tubs_used.get(flavor, 0)
                     break
-        
-       
-    # DEBUG: Check what's in rows for ice cream items
-    print("\n" + "="*50)
-    print("ICE CREAM ITEMS IN ROWS DICT:")
-    print("="*50)
-    for item in TOFTS_ICE_CREAM:
-        if item in rows:
-            print(f"  {item}: sales={rows[item].get('sales', 0)}, scoops_used={rows[item].get('scoops_used', 0)}")
-        else:
-            print(f"  {item}: NOT IN ROWS")
-    print("="*50 + "\n")
-    # ====================================================================
-    # SAME FIX FOR SALES: Consolidate variant sales to base flavors
-    # ====================================================================
+
+    # Consolidate variant sales to base Toft's flavors
     for tofts_flavor in TOFTS_ICE_CREAM:
         normalized = normalize_flavor(tofts_flavor)
-        total_sales = 0
-        
-        # Sum sales from all variants of this flavor
-        for item_name in list(rows.keys()):
-            if normalize_flavor(item_name) == normalized:
-                total_sales += rows[item_name].get("sales", 0)
-        
-        # Write total back to base flavor
+        total_sales = sum(
+            rows[item_name].get("sales", 0)
+            for item_name in list(rows.keys())
+            if normalize_flavor(item_name) == normalized
+        )
         rows[tofts_flavor]["sales"] = total_sales
-# ------------------------------------------------------------
-# FIND PREVIOUS WEEK'S SHEET
-# ------------------------------------------------------------
-    previous_sheet_name = find_previous_week_sheet_name(
-    service,
-    spreadsheet_id,
-    sheet_name
-)
-    print("DEBUG previous sheet:", previous_sheet_name)
 
-# ------------------------------------------------------------
-# READ PREVIOUS WEEK'S ENDING INVENTORY
-# ------------------------------------------------------------
+    # ------------------------------------------------------------
+    # FIND PREVIOUS WEEK'S SHEET (per stand)
+    # ------------------------------------------------------------
+    previous_sheet_name = find_previous_week_sheet_name(
+        service, spreadsheet_id, sheet_name, stand_name
+    )
+
+    # ------------------------------------------------------------
+    # READ PREVIOUS WEEK'S ENDING INVENTORY
+    # ------------------------------------------------------------
     if previous_sheet_name:
         last_week_ending = read_last_week_inventory(
-        service,
-        spreadsheet_id,
-        previous_sheet_name
-    )
+            service, spreadsheet_id, previous_sheet_name
+        )
     else:
         last_week_ending = {}
-    print("DEBUG last week ending:", last_week_ending)
-# ------------------------------------------------------------
-# MERGE INTO STARTING INVENTORY
-# ------------------------------------------------------------
+
+    # ------------------------------------------------------------
+    # MERGE INTO STARTING INVENTORY
+    # ------------------------------------------------------------
     for item in rows:
         rows[item]["starting"] = last_week_ending.get(item, 0)
 
-    #--------------------
-# SPOILAGE INTEGRATION
-# ------------------------------------------------------------
-    spoilage_totals = read_spoilage(sheet, spreadsheet_id)
-
+    # ------------------------------------------------------------
+    # SPOILAGE INTEGRATION
+    # ------------------------------------------------------------
+    spoilage_totals = read_spoilage(sheet, spreadsheet_id, stand_name)
     for item in rows:
         rows[item]["spoilage"] = spoilage_totals.get(item, 0)
 
-    
-# DELIVERIES INTEGRATION  ← ADD THIS BLOCK
-# ------------------------------------------------------------
-    delivery_totals = read_deliveries(sheet, spreadsheet_id)
-    
-    print("DELIVERIES READ:")
-    for item, qty in delivery_totals.items():
-        print(f"  {item}: {qty}")
-    print("="*50)
-
-    # Match deliveries to base flavors first, then variants
+    # ------------------------------------------------------------
+    # DELIVERIES INTEGRATION (accumulated)
+    # ------------------------------------------------------------
+    delivery_totals = read_deliveries(sheet, spreadsheet_id, stand_name)
     for delivery_item, qty in delivery_totals.items():
         found = False
-        
-        # First, try exact match in TOFTS_ICE_CREAM
         for tofts_flavor in TOFTS_ICE_CREAM:
             if tofts_flavor == delivery_item:
                 rows[tofts_flavor]["deliveries"] = qty
                 found = True
                 break
-        
-        # If not found, search all rows
         if not found:
             for item_name in list(rows.keys()):
                 if item_name == delivery_item:
                     rows[item_name]["deliveries"] = qty
                     break
-# ------------------------------------------------------------
-# EXPECTED INVENTORY CALCULATION
-# ------------------------------------------------------------
+
+    # ------------------------------------------------------------
+    # EXPECTED INVENTORY CALCULATION
+    # ------------------------------------------------------------
     expected_totals = calculate_expected_inventory(
-    {item: rows[item].get("starting", 0) for item in rows},
-    {item: rows[item].get("deliveries", 0) for item in rows},
-    {item: rows[item].get("sales", 0) for item in rows},
-    {item: rows[item].get("spoilage", 0) for item in rows},
-)
-    print("Items in rows dict:", list(rows.keys()))
-    print("Expected items from CATEGORY_ORDER:", 
-          
-      [item for cat, items in CATEGORY_ORDER for item in items])
+        {item: rows[item].get("starting", 0) for item in rows},
+        {item: rows[item].get("deliveries", 0) for item in rows},
+        {item: rows[item].get("sales", 0) for item in rows},
+        {item: rows[item].get("spoilage", 0) for item in rows},
+    )
     for item in rows:
         rows[item]["expected"] = expected_totals.get(item, 0)
 
-    output_rows = []
-    print("DEBUG CATEGORY_ORDER:", CATEGORY_ORDER)
-
-    # Header row
+    # ------------------------------------------------------------
+    # BUILD OUTPUT ROWS
+    # Track sheet row numbers so variance formulas reference correct cells.
+    # Row 1 = header, rows 2+ = data/category rows.
+    # ------------------------------------------------------------
     header = [
         "CATEGORY", "ITEM", "STARTING", "DELIVERIES",
         "SALES", "SCOOPS USED", "TUBS USED", "SPOILAGE", "EXPECTED", "ACTUAL", "VARIANCE"
     ]
-    output_rows.append(header)
-    print("Loaded items:", list(rows.keys()))
+    # Derive column letters from header positions (0-indexed → A, B, C ...)
+    COL_EXPECTED = chr(ord("A") + header.index("EXPECTED"))   # I
+    COL_ACTUAL   = chr(ord("A") + header.index("ACTUAL"))     # J
 
-    # Build grouped rows
+    output_rows = [header]
+    sheet_row = 2  # first data row in the sheet (1-indexed)
+
     for category_name, item_list in CATEGORY_ORDER:
         output_rows.append([category_name] + [""] * 10)
-
+        sheet_row += 1
 
         for item in sorted(item_list):
             if item in rows:
+                variance_formula = (
+                    f'=IF({COL_ACTUAL}{sheet_row}="",'
+                    f'"",{COL_ACTUAL}{sheet_row}-{COL_EXPECTED}{sheet_row})'
+                )
                 output_rows.append([
-            "", item,
-            rows[item].get("starting", 0),
-            rows[item].get("deliveries", 0),
-            rows[item].get("sales", 0),
-            rows[item].get("scoops_used", 0),
-            rows[item].get("tubs_used", 0),
-            rows[item].get("spoilage", 0),
-            rows[item].get("expected", 0),
-            rows[item].get("actual", ""),
-            rows[item].get("variance", "")
-        ])
+                    "", item,
+                    rows[item].get("starting", 0),
+                    rows[item].get("deliveries", 0),
+                    rows[item].get("sales", 0),
+                    rows[item].get("scoops_used", 0),
+                    rows[item].get("tubs_used", 0),
+                    rows[item].get("spoilage", 0),
+                    rows[item].get("expected", 0),
+                    rows[item].get("actual", ""),
+                    variance_formula,
+                ])
             else:
-        # For manual items like janitorial, only fill ITEM and ACTUAL
-                output_rows.append(
-               ["", item, "", "", "", "", "", "", "", "", ""]
-
-            )
+                output_rows.append(["", item, "", "", "", "", "", "", "", "", ""])
+            sheet_row += 1
 
     # ------------------------------------------------------------
-    # 3. WRITE VALUES TO SHEET
+    # WRITE VALUES TO SHEET
     # ------------------------------------------------------------
-    # Ensure all rows have the same number of columns
     expected_cols = len(header)
     for i, row in enumerate(output_rows):
         if len(row) < expected_cols:
@@ -901,16 +919,15 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
         elif len(row) > expected_cols:
             output_rows[i] = row[:expected_cols]
 
-    body = {"values": output_rows}
     service.spreadsheets().values().update(
         spreadsheetId=spreadsheet_id,
         range=f"{sheet_name}!A1:K",
         valueInputOption="USER_ENTERED",
-        body=body
+        body={"values": output_rows}
     ).execute()
 
     # ------------------------------------------------------------
-    # 4. FORMATTING REQUESTS
+    # FORMATTING REQUESTS
     # ------------------------------------------------------------
     requests = []
     sheet_id = get_sheet_id(service, spreadsheet_id, sheet_name)
@@ -923,75 +940,57 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
         }
     })
 
-    # Header formatting (FINAL, CORRECT BLOCK)
-    # Set explicit column widths for header clarity
-
+    # Set column widths
     requests.append({
-    "updateDimensionProperties": {
-        "range": {
-            "sheetId": sheet_id,
-            "dimension": "COLUMNS",
-            "startIndex": 0,
-            "endIndex": 11
-        },
-        "properties": {"pixelSize": 140},
-        "fields": "pixelSize"
-    }
+        "updateDimensionProperties": {
+            "range": {
+                "sheetId": sheet_id,
+                "dimension": "COLUMNS",
+                "startIndex": 0,
+                "endIndex": 11
+            },
+            "properties": {"pixelSize": 140},
+            "fields": "pixelSize"
+        }
     })
-    
-    # ------------------------------------------------------------
-# HEADER FORMATTING (bold, background, alignment)
-# ------------------------------------------------------------
+
+    # Header row: blue background, white bold text, centered
     requests.append({
         "repeatCell": {
-        "range": {
+            "range": {
                 "sheetId": sheet_id,
                 "startRowIndex": 0,
                 "endRowIndex": 1,
                 "startColumnIndex": 0,
                 "endColumnIndex": 11
-        },
-        "cell": {
-            "userEnteredFormat": {
-                "backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9},
-                "textFormat": {"bold": True},
-                "horizontalAlignment": "CENTER"
-             }
+            },
+            "cell": {
+                "userEnteredFormat": {
+                    "backgroundColor": {"red": 0.267, "green": 0.447, "blue": 0.769},
+                    "textFormat": {"bold": True, "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
+                    "horizontalAlignment": "CENTER"
+                }
             },
             "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)"
         }
     })
 
-    # Color category rows  ← NO INDENT HERE
-    category_names = [
-        "ICE CREAM (Toft's Scoops)",
-        "NOVELTY ICE CREAM",
-        "CANDY",
-        "DRINKS",
-        "MEALS",
-        "SNACKS",
-        "SNOW CONES / SYRUPS",
-        "JANITORIAL / CONSUMABLES",
-    ]
-   
-
-    print("Category rows detected:")
-
+    # Category rows: light blue background, bold text
+    category_names_set = {cat for cat, _ in CATEGORY_ORDER}
     for i, row in enumerate(output_rows):
-       if isinstance(row, list) and len(row) >= 2 and row[0] in category_names and row[1] == "":
-            print(f"Row {i}: {row[0]}")
+        if isinstance(row, list) and len(row) >= 2 and row[0] in category_names_set and row[1] == "":
             requests.append({
                 "repeatCell": {
                     "range": {
                         "sheetId": sheet_id,
                         "startRowIndex": i,
                         "endRowIndex": i + 1,
-                        "startColumnIndex":0,
+                        "startColumnIndex": 0,
                         "endColumnIndex": 11
                     },
                     "cell": {
                         "userEnteredFormat": {
-                            "backgroundColor": {"red": 1, "green": 1, "blue": 0},
+                            "backgroundColor": {"red": 0.647, "green": 0.761, "blue": 0.902},
                             "textFormat": {"bold": True}
                         }
                     },
@@ -999,7 +998,42 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
                 }
             })
 
-     # ------------------------------------------------------------
+    # Conditional formatting: green for positive variance, red for negative
+    variance_col_idx = header.index("VARIANCE")
+    variance_range = [{
+        "sheetId": sheet_id,
+        "startRowIndex": 1,
+        "endRowIndex": len(output_rows),
+        "startColumnIndex": variance_col_idx,
+        "endColumnIndex": variance_col_idx + 1
+    }]
+    requests.append({
+        "addConditionalFormatRule": {
+            "rule": {
+                "ranges": variance_range,
+                "booleanRule": {
+                    "condition": {"type": "NUMBER_GREATER", "values": [{"userEnteredValue": "0"}]},
+                    "format": {"backgroundColor": {"red": 0.576, "green": 0.769, "blue": 0.490}}
+                }
+            },
+            "index": 0
+        }
+    })
+    # Conditional formatting: red for negative variance
+    requests.append({
+        "addConditionalFormatRule": {
+            "rule": {
+                "ranges": variance_range,
+                "booleanRule": {
+                    "condition": {"type": "NUMBER_LESS", "values": [{"userEnteredValue": "0"}]},
+                    "format": {"backgroundColor": {"red": 0.918, "green": 0.267, "blue": 0.208}}
+                }
+            },
+            "index": 1
+        }
+    })
+
+    # ------------------------------------------------------------
     # APPLY FORMATTING
     # ------------------------------------------------------------
     service.spreadsheets().batchUpdate(
@@ -1007,13 +1041,7 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
         body={"requests": requests}
     ).execute()
 
-    # Calculate variance (only if ACTUAL is filled)
-    calculate_variance(service.spreadsheets().values(), row_lookup)
 
-
-   
-
-   
 
 
 
