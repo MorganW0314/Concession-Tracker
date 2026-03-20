@@ -131,7 +131,13 @@ def normalize_item(item):
     item = " ".join(item.split())
     return item
 
+CSV_NAME_MAPPING = {
+    "Cotton Candy": "Cotton Candy (Candy)",  # Maps CSV "Cotton Candy" → Candy category
+}
 
+def normalize_csv_item_name(item_name):
+    """Convert CSV item names to match category list names."""
+    return CSV_NAME_MAPPING.get(item_name, item_name)
 #
 
 def write_values (sheet, spreadsheet_id, range_string, values):
@@ -308,6 +314,8 @@ def read_sales(sheet, spreadsheet_id, sheet_name):
             continue
 
         item_name = row[0].strip()
+        item_name = normalize_csv_item_name(item_name)  # Apply mapping FIRST
+        item_name = normalize_csv_item_name(item_name)  # Add this line
         actual_sales = row[7]  # Column H
 
         if actual_sales == "":
@@ -324,6 +332,7 @@ def read_sales(sheet, spreadsheet_id, sheet_name):
             sales[key] = 0
 
         sales[key] += actual_sales
+        
 
     return sales
 
