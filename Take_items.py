@@ -11,10 +11,8 @@ COMBO_BREAKDOWN = {
     "Pulled Pork Combo": ["Chicken Tenders", "Fries", "Fountain Drink"],
 }
 
-def take_items(stand_name):
-    csv_path = os.path.join(
-        os.path.expanduser("~"), "Downloads", f"purchases_{stand_name}.csv"
-    )
+def take_items(csv_file_path):
+    csv_path = csv_file_path
     rows = {}
 
 

@@ -1,3 +1,4 @@
+import glob 
 from Take_items import take_items   # your CSV ingestion function
 from Call_sheets import write_full_week
 from Call_sheets import create_weekly_sheet
@@ -44,6 +45,31 @@ while True:
 
 print(f"\nProcessing stand: {stand_name}")
 
+downloads_folder = os.path.expanduser("~/Downloads")
+csv_files = glob.glob(os.path.join(downloads_folder, "*.csv"))
+
+if not csv_files:
+    print("No CSV files found in Downloads!")
+    exit()
+
+print(f"\nAvailable CSV files:")
+for i, file in enumerate(csv_files, 1):
+    print(f"  {i}. {os.path.basename(file)}")
+
+while True:
+    choice = input(f"\nSelect CSV file (1-{len(csv_files)}): ").strip()
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(csv_files):
+            csv_file = csv_files[idx]
+            break
+        else:
+            print(f"Please enter a number between 1 and {len(csv_files)}.")
+    except ValueError:
+        print("Invalid input. Please enter a number.")
+
+print(f"Using: {os.path.basename(csv_file)}\n")
+
 # ------------------------------------------------------------
 # GOOGLE SHEETS AUTH
 # ------------------------------------------------------------
@@ -59,7 +85,7 @@ sheet = service.spreadsheets()
 # 1. READ CSV → rows dict
 # ------------------------------------------------------------
 print(f"Reading purchases_{stand_name}.csv from Downloads...")
-rows = take_items(stand_name)
+rows = take_items(csv_file)
 print("Parsed rows:")
 print(rows)
 
