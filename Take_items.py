@@ -1,4 +1,5 @@
 import csv
+import os
 
 COMBO_BREAKDOWN = {
     
@@ -10,7 +11,10 @@ COMBO_BREAKDOWN = {
     "Pulled Pork Combo": ["Chicken Tenders", "Fries", "Fountain Drink"],
 }
 
-def take_items(csv_path):
+def take_items(stand_name):
+    csv_path = os.path.join(
+        os.path.expanduser("~"), "Downloads", f"purchases_{stand_name}.csv"
+    )
     rows = {}
 
 
@@ -79,7 +83,7 @@ def take_items(csv_path):
     return rows
 # TEST: Call the function and see output
 if __name__ == "__main__":
-    rows = take_items("purchases.csv")  # or whatever your CSV filename is
+    rows = take_items("Bevelhymer Green")  # replace with desired stand name
     print("Done!")
     print("\n====================")
     print("FLAVOR KEYS FOUND:")
