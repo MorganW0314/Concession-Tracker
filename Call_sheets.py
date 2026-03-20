@@ -131,15 +131,6 @@ def normalize_item(item):
     item = " ".join(item.split())
     return item
 
-CSV_NAME_MAPPING = {
-    "Cotton Candy": "Cotton Candy (Candy)",  # Maps CSV "Cotton Candy" → Candy category
-}
-
-def normalize_csv_item_name(item_name):
-    """Convert CSV item names to match category list names."""
-    return CSV_NAME_MAPPING.get(item_name, item_name)
-#
-
 def write_values (sheet, spreadsheet_id, range_string, values):
     """Write a 2D list of values to a range."""
     body = {"values": values}
@@ -314,8 +305,6 @@ def read_sales(sheet, spreadsheet_id, sheet_name):
             continue
 
         item_name = row[0].strip()
-        item_name = normalize_csv_item_name(item_name)  # Apply mapping FIRST
-        item_name = normalize_csv_item_name(item_name)  # Add this line
         actual_sales = row[7]  # Column H
 
         if actual_sales == "":
@@ -800,9 +789,6 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows, stand_name
                     "expected": 0,
                     "actual": "",
                 }
-                normalized = normalize_flavor(item)
-                if normalized not in rows:
-                    rows[normalized] = rows[item]
 
     # ------------------------------------------------------------
     # ICE CREAM SCOOP + TUBS LOGIC
@@ -811,29 +797,10 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows, stand_name
     tubs_used = tubs_used_from_scoops(flavor_totals)
 
     for flavor, scoops in flavor_totals.items():
-        found = False
         for tofts_flavor in TOFTS_ICE_CREAM:
             if normalize_flavor(tofts_flavor) == flavor:
                 rows[tofts_flavor]["scoops_used"] = scoops
                 rows[tofts_flavor]["tubs_used"] = tubs_used.get(flavor, 0)
-                found = True
-                break
-        if not found:
-            for item_name in list(rows.keys()):
-                if normalize_flavor(item_name) == flavor:
-                    rows[item_name]["scoops_used"] = scoops
-                    rows[item_name]["tubs_used"] = tubs_used.get(flavor, 0)
-                    break
-
-    # Consolidate variant sales to base Toft's flavors
-    for tofts_flavor in TOFTS_ICE_CREAM:
-        normalized = normalize_flavor(tofts_flavor)
-        total_sales = sum(
-            rows[item_name].get("sales", 0)
-            for item_name in list(rows.keys())
-            if normalize_flavor(item_name) == normalized
-        )
-        rows[tofts_flavor]["sales"] = total_sales
 
     # ------------------------------------------------------------
     # FIND PREVIOUS WEEK'S SHEET (per stand)
