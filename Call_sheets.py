@@ -814,10 +814,29 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows):
 # DELIVERIES INTEGRATION  ← ADD THIS BLOCK
 # ------------------------------------------------------------
     delivery_totals = read_deliveries(sheet, spreadsheet_id)
-
-    for item in rows:
-        rows[item]["deliveries"] = delivery_totals.get(item, 0)
     
+    print("DELIVERIES READ:")
+    for item, qty in delivery_totals.items():
+        print(f"  {item}: {qty}")
+    print("="*50)
+
+    # Match deliveries to base flavors first, then variants
+    for delivery_item, qty in delivery_totals.items():
+        found = False
+        
+        # First, try exact match in TOFTS_ICE_CREAM
+        for tofts_flavor in TOFTS_ICE_CREAM:
+            if tofts_flavor == delivery_item:
+                rows[tofts_flavor]["deliveries"] = qty
+                found = True
+                break
+        
+        # If not found, search all rows
+        if not found:
+            for item_name in list(rows.keys()):
+                if item_name == delivery_item:
+                    rows[item_name]["deliveries"] = qty
+                    break
 # ------------------------------------------------------------
 # EXPECTED INVENTORY CALCULATION
 # ------------------------------------------------------------
