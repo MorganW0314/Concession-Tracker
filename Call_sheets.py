@@ -181,8 +181,8 @@ def read_deliveries(sheet, spreadsheet_id, stand_name):
 
     Quantities are ACCUMULATED so multiple deliveries in one week are summed.
     """
-    tab = f"Deliveries - {stand_name}"
-    rows = get_values(sheet, spreadsheet_id, f"{tab}!A2:D200")
+    tab = f"Deliveries-{stand_name}"
+    rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A2:D200")
 
     deliveries = {}
 
@@ -220,8 +220,12 @@ def read_spoilage(sheet, spreadsheet_id, stand_name):
 
     Quantities are ACCUMULATED across all rows for the week.
     """
-    tab = f"Spoilage - {stand_name}"
-    rows = get_values(sheet, spreadsheet_id, f"{tab}!A2:C200")
+    tab = f"Spoilage-{stand_name}"
+    try:
+        rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A2:C200")
+    except Exception as e:
+        print(f"Warning: Could not read spoilage sheet '{tab}'. Starting with no spoilage data.")
+        return {}
 
     spoilage = {}
 
@@ -243,6 +247,20 @@ def read_spoilage(sheet, spreadsheet_id, stand_name):
 
     return spoilage
 
+
+def clear_spoilage_sheet(sheet, spreadsheet_id, stand_name):
+    """Clear all data rows from the Spoilage sheet after reading."""
+    tab = f"Spoilage-{stand_name}"
+    try:
+        # Delete rows 2 onwards (keep header in row 1)
+        sheet.values().clear(
+            spreadsheetId=spreadsheet_id,
+            range=f"'{tab}'!A2:C1000"
+        ).execute()
+        print(f"Cleared spoilage data from {tab}")
+    except Exception as e:
+        print(f"Could not clear spoilage sheet: {e}")
+
 def read_master_items(sheet, spreadsheet_id, stand_name):
     """Read the Master Items - {stand} tab and return a list of (category, item) tuples.
 
@@ -254,9 +272,9 @@ def read_master_items(sheet, spreadsheet_id, stand_name):
     This list is used to build the CATEGORY_ORDER for write_full_week so items
     always appear even when not sold in a given week.
     """
-    tab = f"Master Items - {stand_name}"
+    tab = f"Master Items-{stand_name}"
     try:
-        rows = get_values(sheet, spreadsheet_id, f"{tab}!A2:B500")
+       rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A2:B500")
     except Exception:
         return None  # Tab does not exist yet
 
@@ -837,7 +855,7 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows, stand_name
     spoilage_totals = read_spoilage(sheet, spreadsheet_id, stand_name)
     for item in rows:
         rows[item]["spoilage"] = spoilage_totals.get(item, 0)
-
+    clear_spoilage_sheet(sheet, spreadsheet_id, stand_name)
     # ------------------------------------------------------------
     # DELIVERIES INTEGRATION (accumulated)
     # ------------------------------------------------------------
