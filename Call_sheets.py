@@ -16,6 +16,245 @@ def get_sheet_id(service, spreadsheet_id, sheet_name):
             return sheet["properties"]["sheetId"]
     raise ValueError(f"Sheet name '{sheet_name}' not found.")
 
+
+# ---------------------------------------------------------------------------
+# Horizontal-week layout constants
+# ---------------------------------------------------------------------------
+# Each week occupies this many columns to the right of Column A.
+COLS_PER_WEEK = 9
+
+# Sub-header labels written in row 2 for every week block.
+WEEK_COL_HEADERS = [
+    "Starting", "Deliveries", "Sales", "Spoilage",
+    "Expected", "Actual", "Variance", "Scoops Used", "Tubs Used",
+]
+
+# 0-based offsets within a week's column block.
+COL_STARTING   = 0
+COL_DELIVERIES = 1
+COL_SALES      = 2
+COL_SPOILAGE   = 3
+COL_EXPECTED   = 4
+COL_ACTUAL     = 5
+COL_VARIANCE   = 6
+COL_SCOOPS     = 7
+COL_TUBS       = 8
+
+# Fixed row numbers (1-indexed) in every stand sheet.
+HEADER_ROW    = 1   # Week-label row  (e.g. "Week of 03-23-2026")
+SUBHEADER_ROW = 2   # Column-name row (Starting | Deliveries | …)
+DATA_START_ROW = 3  # First category / item row
+
+
+def col_letter(col_index):
+    """Convert a 0-based column index to an A1-notation letter string.
+
+    Examples: 0 → "A", 25 → "Z", 26 → "AA", 51 → "AZ", 52 → "BA".
+    """
+    result = ""
+    n = col_index + 1
+    while n > 0:
+        n, remainder = divmod(n - 1, 26)
+        result = chr(65 + remainder) + result
+    return result
+
+
+def find_last_week_start_col(sheet, spreadsheet_id, sheet_name):
+    """Return the 0-based column index of the *last* week-label written in row 1.
+
+    Week labels are placed in the first column of every week block (B, K, T, …).
+    Column A ("ITEM") is always skipped.
+    Returns 0 when no weeks have been appended yet.
+    """
+    result = sheet.values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{sheet_name}'!{HEADER_ROW}:{HEADER_ROW}",
+    ).execute()
+
+    row = (result.get("values") or [[]])[0]
+    last_week_start = 0
+    for i in range(1, len(row)):   # skip col A (index 0)
+        if row[i]:
+            last_week_start = i
+    return last_week_start
+
+
+def read_item_row_map(sheet, spreadsheet_id, sheet_name):
+    """Read column A of a stand sheet and return {item_name: row_number}.
+
+    Rows 1 and 2 are header rows and are always skipped.
+    Row numbers are 1-indexed (matching Google Sheets notation).
+    """
+    result = sheet.values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{sheet_name}'!A:A",
+    ).execute()
+
+    col_a = result.get("values", [])
+    item_row_map = {}
+    for i, cell in enumerate(col_a):
+        row_num = i + 1
+        if row_num < DATA_START_ROW:
+            continue
+        if cell and cell[0].strip():
+            item_row_map[cell[0].strip()] = row_num
+    return item_row_map
+
+
+def read_last_week_actuals_from_stand_sheet(sheet, spreadsheet_id, sheet_name):
+    """Return the most recent week's Actual values as {item_name: quantity}.
+
+    The Actual column is at offset COL_ACTUAL within its week's block.
+    Returns an empty dict when no weeks have been written yet.
+    """
+    last_week_start = find_last_week_start_col(sheet, spreadsheet_id, sheet_name)
+    if last_week_start == 0:
+        return {}
+
+    actual_col = col_letter(last_week_start + COL_ACTUAL)
+
+    # Read both column A (names) and the Actual column in one pass via item_row_map.
+    item_row_map = read_item_row_map(sheet, spreadsheet_id, sheet_name)
+
+    result = sheet.values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{sheet_name}'!{actual_col}:{actual_col}",
+    ).execute()
+    actual_col_values = result.get("values", [])
+
+    actuals = {}
+    for item, row_num in item_row_map.items():
+        idx = row_num - 1   # 0-based
+        if idx < len(actual_col_values):
+            cell = actual_col_values[idx]
+            if cell and cell[0]:
+                try:
+                    actuals[item] = int(float(cell[0]))
+                except (ValueError, TypeError):
+                    actuals[item] = 0
+    return actuals
+
+
+def ensure_stand_sheet_exists(service, spreadsheet_id, stand_name, sheet, category_order):
+    """Create a stand sheet and populate Column A if it does not already exist.
+
+    The sheet is named after the stand (e.g. "Bevelhymer Green").
+    Row 1 gets "ITEM" in A1.
+    Rows starting at DATA_START_ROW contain category headers and sorted item names.
+    Returns the integer sheetId.
+    """
+    metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    for s in metadata.get("sheets", []):
+        if s["properties"]["title"] == stand_name:
+            return s["properties"]["sheetId"]
+
+    # Create the sheet tab.
+    response = service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={"requests": [{
+            "addSheet": {
+                "properties": {
+                    "title": stand_name,
+                    "gridProperties": {"rowCount": 500, "columnCount": 200},
+                }
+            }
+        }]},
+    ).execute()
+    new_sheet_id = response["replies"][0]["addSheet"]["properties"]["sheetId"]
+
+    # Build column A content: [ITEM label, blank sub-header row, then categories/items].
+    col_a_data = [["ITEM"], [""]]
+    for category_name, item_list in category_order:
+        col_a_data.append([category_name])
+        for item in sorted(item_list):
+            col_a_data.append([item])
+
+    service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{stand_name}'!A1",
+        valueInputOption="RAW",
+        body={"values": col_a_data},
+    ).execute()
+
+    # --- Formatting for column A ---
+    fmt_requests = []
+
+    # Freeze top 2 rows and the first column so they stay visible while scrolling.
+    fmt_requests.append({
+        "updateSheetProperties": {
+            "properties": {
+                "sheetId": new_sheet_id,
+                "gridProperties": {"frozenRowCount": 2, "frozenColumnCount": 1},
+            },
+            "fields": "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
+        }
+    })
+
+    # A1 header: blue background, white bold centred text.
+    fmt_requests.append({
+        "repeatCell": {
+            "range": {
+                "sheetId": new_sheet_id,
+                "startRowIndex": 0, "endRowIndex": 1,
+                "startColumnIndex": 0, "endColumnIndex": 1,
+            },
+            "cell": {
+                "userEnteredFormat": {
+                    "backgroundColor": {"red": 0.267, "green": 0.447, "blue": 0.769},
+                    "textFormat": {
+                        "bold": True,
+                        "foregroundColor": {"red": 1, "green": 1, "blue": 1},
+                    },
+                    "horizontalAlignment": "CENTER",
+                }
+            },
+            "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
+        }
+    })
+
+    # Category rows in column A: light-blue background, bold text.
+    row_idx = DATA_START_ROW - 1   # 0-based
+    for category_name, item_list in category_order:
+        fmt_requests.append({
+            "repeatCell": {
+                "range": {
+                    "sheetId": new_sheet_id,
+                    "startRowIndex": row_idx, "endRowIndex": row_idx + 1,
+                    "startColumnIndex": 0, "endColumnIndex": 1,
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "backgroundColor": {"red": 0.647, "green": 0.761, "blue": 0.902},
+                        "textFormat": {"bold": True},
+                    }
+                },
+                "fields": "userEnteredFormat(backgroundColor,textFormat)",
+            }
+        })
+        row_idx += 1 + len(item_list)  # skip category row + all its items
+
+    # Set column A width to 200 px so item names are fully visible.
+    fmt_requests.append({
+        "updateDimensionProperties": {
+            "range": {
+                "sheetId": new_sheet_id,
+                "dimension": "COLUMNS",
+                "startIndex": 0,
+                "endIndex": 1,
+            },
+            "properties": {"pixelSize": 200},
+            "fields": "pixelSize",
+        }
+    })
+
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={"requests": fmt_requests},
+    ).execute()
+
+    return new_sheet_id
+
+
 def create_weekly_sheet(service, spreadsheet_id, stand_name):
     # 1. Generate the new tab name including stand name
     from datetime import datetime
@@ -735,22 +974,29 @@ def find_previous_week_sheet_name(service, spreadsheet_id, current_sheet_name, s
     return None  # No previous sheet found
 
 
-def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows, stand_name):
+def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
+    """Append one week's inventory data as 9 new columns to the stand's sheet.
 
-    """
-    Writes a fully formatted weekly inventory sheet for a given stand with:
-    - Category grouping (from Master Items tab or hardcoded fallback)
-    - Blue header row, light-blue category rows matching 2025 sheet design
-    - Green/red conditional formatting on Variance column
-    - Variance written as a formula so it auto-calculates when Actual is filled
-    - Frozen header row
+    Sheet layout
+    ------------
+    * Column A  – static item list (category headers + sorted item names).
+    * Row 1     – week-label row: "Week of MM-DD-YYYY" in the first column of
+                  each week's block; Column A always contains "ITEM".
+    * Row 2     – sub-header row: Starting | Deliveries | Sales | Spoilage |
+                  Expected | Actual | Variance | Scoops Used | Tubs Used
+                  repeated for every week block; Column A is blank.
+    * Row 3+    – data rows: one row per category header or item.
+
+    On the first run the stand sheet is created automatically.  Subsequent
+    runs detect the last week via the week labels in row 1 and append 9 more
+    columns to the right — no new sheet tabs are created.
     """
 
     # ============================
     # CATEGORY ORDER
-    # Try to read from "Master Items - {stand}" tab first; fall back to hardcoded lists.
+    # Try to read from "Master Items-{stand}" tab first; fall back to hardcoded
+    # lists.
     # ============================
-
     master_items = read_master_items(sheet, spreadsheet_id, stand_name)
 
     if master_items:
@@ -773,68 +1019,65 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows, stand_name
             ("JANITORIAL / CONSUMABLES", JANITORIAL),
         ]
 
-    # ====================================================================
-    # ENSURE ALL ITEMS FROM CATEGORY_ORDER APPEAR, EVEN WITH 0 SALES
-    # ====================================================================
+    # ============================
+    # ENSURE STAND SHEET EXISTS (creates it with items in col A if absent)
+    # ============================
+    ensure_stand_sheet_exists(service, spreadsheet_id, stand_name, sheet, CATEGORY_ORDER)
+    sheet_id = get_sheet_id(service, spreadsheet_id, stand_name)
+
+    # ============================
+    # ENSURE ALL ITEMS APPEAR, EVEN WITH 0 SALES
+    # ============================
     for category_name, item_list in CATEGORY_ORDER:
         for item in item_list:
             if item not in rows:
                 rows[item] = {
-                    "starting": 0,
-                    "deliveries": 0,
-                    "sales": 0,
-                    "spoilage": 0,
-                    "scoops_used": 0,
-                    "tubs_used": 0,
-                    "expected": 0,
-                    "actual": "",
+                    "starting": 0, "deliveries": 0, "sales": 0,
+                    "spoilage": 0, "scoops_used": 0, "tubs_used": 0,
+                    "expected": 0, "actual": "",
                 }
 
-    # ------------------------------------------------------------
+    # ============================
     # ICE CREAM SCOOP + TUBS LOGIC
-    # ------------------------------------------------------------
+    # ============================
     flavor_totals = group_scoops_by_flavor(rows)
-    tubs_used = tubs_used_from_scoops(flavor_totals)
+    tubs_used_map = tubs_used_from_scoops(flavor_totals)
 
     for flavor, scoops in flavor_totals.items():
         for tofts_flavor in TOFTS_ICE_CREAM:
             if normalize_flavor(tofts_flavor) == flavor:
                 rows[tofts_flavor]["scoops_used"] = scoops
-                rows[tofts_flavor]["tubs_used"] = tubs_used.get(flavor, 0)
+                rows[tofts_flavor]["tubs_used"] = tubs_used_map.get(flavor, 0)
 
-    # ------------------------------------------------------------
-    # FIND PREVIOUS WEEK'S SHEET (per stand)
-    # ------------------------------------------------------------
-    previous_sheet_name = find_previous_week_sheet_name(
-        service, spreadsheet_id, sheet_name, stand_name
-    )
-
-    # ------------------------------------------------------------
-    # READ PREVIOUS WEEK'S ENDING INVENTORY
-    # ------------------------------------------------------------
-    if previous_sheet_name:
-        last_week_ending = read_last_week_inventory(
-            service, spreadsheet_id, previous_sheet_name
-        )
+    # ============================
+    # FIND WHERE THE NEXT WEEK'S COLUMNS START
+    # ============================
+    last_week_start = find_last_week_start_col(sheet, spreadsheet_id, stand_name)
+    if last_week_start == 0:
+        next_week_start = 1             # No weeks yet → start at column B
     else:
-        last_week_ending = {}
+        next_week_start = last_week_start + COLS_PER_WEEK
 
-    # ------------------------------------------------------------
-    # MERGE INTO STARTING INVENTORY
-    # ------------------------------------------------------------
+    # ============================
+    # READ LAST WEEK'S ACTUALS → THIS WEEK'S STARTING INVENTORY
+    # ============================
+    last_week_actuals = read_last_week_actuals_from_stand_sheet(
+        sheet, spreadsheet_id, stand_name
+    )
     for item in rows:
-        rows[item]["starting"] = last_week_ending.get(item, 0)
+        rows[item]["starting"] = last_week_actuals.get(item, 0)
 
-    # ------------------------------------------------------------
+    # ============================
     # SPOILAGE INTEGRATION
-    # ------------------------------------------------------------
+    # ============================
     spoilage_totals = read_spoilage(sheet, spreadsheet_id, stand_name)
     for item in rows:
         rows[item]["spoilage"] = spoilage_totals.get(item, 0)
     clear_spoilage_sheet(sheet, spreadsheet_id, stand_name)
-    # ------------------------------------------------------------
+
+    # ============================
     # DELIVERIES INTEGRATION (accumulated)
-    # ------------------------------------------------------------
+    # ============================
     delivery_totals = read_deliveries(sheet, spreadsheet_id, stand_name)
     for delivery_item, qty in delivery_totals.items():
         found = False
@@ -849,9 +1092,9 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows, stand_name
                     rows[item_name]["deliveries"] = qty
                     break
 
-    # ------------------------------------------------------------
+    # ============================
     # EXPECTED INVENTORY CALCULATION
-    # ------------------------------------------------------------
+    # ============================
     expected_totals = calculate_expected_inventory(
         {item: rows[item].get("starting", 0) for item in rows},
         {item: rows[item].get("deliveries", 0) for item in rows},
@@ -861,179 +1104,247 @@ def write_full_week(sheet, service, spreadsheet_id, sheet_name, rows, stand_name
     for item in rows:
         rows[item]["expected"] = expected_totals.get(item, 0)
 
-    # ------------------------------------------------------------
-    # BUILD OUTPUT ROWS
-    # Track sheet row numbers so variance formulas reference correct cells.
-    # Row 1 = header, rows 2+ = data/category rows.
-    # ------------------------------------------------------------
-    header = [
-        "CATEGORY", "ITEM", "STARTING", "DELIVERIES",
-        "SALES", "SCOOPS USED", "TUBS USED", "SPOILAGE", "EXPECTED", "ACTUAL", "VARIANCE"
-    ]
-    # Derive column letters from header positions (0-indexed → A, B, C ...)
-    COL_EXPECTED = chr(ord("A") + header.index("EXPECTED"))   # I
-    COL_ACTUAL   = chr(ord("A") + header.index("ACTUAL"))     # J
+    # ============================
+    # BUILD ITEM → ROW-NUMBER LOOKUP (reads column A of the stand sheet)
+    # ============================
+    item_row_map = read_item_row_map(sheet, spreadsheet_id, stand_name)
 
-    output_rows = [header]
-    sheet_row = 2  # first data row in the sheet (1-indexed)
+    # ============================
+    # WRITE WEEK LABEL (row 1) AND COLUMN SUB-HEADERS (row 2)
+    # ============================
+    week_label = datetime.today().strftime("Week of %m-%d-%Y")
+    week_start_letter = col_letter(next_week_start)
+    week_end_letter   = col_letter(next_week_start + COLS_PER_WEEK - 1)
 
-    for category_name, item_list in CATEGORY_ORDER:
-        output_rows.append([category_name] + [""] * 10)
-        sheet_row += 1
-
-        for item in sorted(item_list):
-            if item in rows:
-                variance_formula = (
-                    f'=IF({COL_ACTUAL}{sheet_row}="",'
-                    f'"",{COL_ACTUAL}{sheet_row}-{COL_EXPECTED}{sheet_row})'
-                )
-                output_rows.append([
-                    "", item,
-                    rows[item].get("starting", 0),
-                    rows[item].get("deliveries", 0),
-                    rows[item].get("sales", 0),
-                    rows[item].get("scoops_used", 0),
-                    rows[item].get("tubs_used", 0),
-                    rows[item].get("spoilage", 0),
-                    rows[item].get("expected", 0),
-                    rows[item].get("actual", ""),
-                    variance_formula,
-                ])
-            else:
-                output_rows.append(["", item, "", "", "", "", "", "", "", "", ""])
-            sheet_row += 1
-
-    # ------------------------------------------------------------
-    # WRITE VALUES TO SHEET
-    # ------------------------------------------------------------
-    expected_cols = len(header)
-    for i, row in enumerate(output_rows):
-        if len(row) < expected_cols:
-            output_rows[i] = row + [""] * (expected_cols - len(row))
-        elif len(row) > expected_cols:
-            output_rows[i] = row[:expected_cols]
-
+    # Row 1: week label in first column of this week's block only.
     service.spreadsheets().values().update(
         spreadsheetId=spreadsheet_id,
-        range=f"{sheet_name}!A1:K",
-        valueInputOption="USER_ENTERED",
-        body={"values": output_rows}
+        range=f"'{stand_name}'!{week_start_letter}{HEADER_ROW}",
+        valueInputOption="RAW",
+        body={"values": [[week_label]]},
     ).execute()
 
-    # ------------------------------------------------------------
-    # FORMATTING REQUESTS
-    # ------------------------------------------------------------
-    requests = []
-    sheet_id = get_sheet_id(service, spreadsheet_id, sheet_name)
+    # Row 2: all nine sub-headers.
+    service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{stand_name}'!{week_start_letter}{SUBHEADER_ROW}",
+        valueInputOption="RAW",
+        body={"values": [WEEK_COL_HEADERS]},
+    ).execute()
 
-    # Freeze header row
-    requests.append({
-        "updateSheetProperties": {
-            "properties": {"sheetId": sheet_id, "gridProperties": {"frozenRowCount": 1}},
-            "fields": "gridProperties.frozenRowCount"
-        }
-    })
+    # ============================
+    # WRITE ITEM DATA ROW BY ROW
+    # ============================
+    # Pre-compute column letters for this week block (same for every row).
+    s_col  = col_letter(next_week_start + COL_STARTING)
+    d_col  = col_letter(next_week_start + COL_DELIVERIES)
+    sa_col = col_letter(next_week_start + COL_SALES)
+    sp_col = col_letter(next_week_start + COL_SPOILAGE)
+    ex_col = col_letter(next_week_start + COL_EXPECTED)
+    ac_col = col_letter(next_week_start + COL_ACTUAL)
+    va_col = col_letter(next_week_start + COL_VARIANCE)
+    sc_col = col_letter(next_week_start + COL_SCOOPS)
+    tu_col = col_letter(next_week_start + COL_TUBS)
 
-    # Set column widths
-    requests.append({
-        "updateDimensionProperties": {
+    batch_data = []
+
+    for category_name, item_list in CATEGORY_ORDER:
+        for item in sorted(item_list):
+            row_num = item_row_map.get(item)
+            if not row_num:
+                continue
+
+            is_tofts = item in TOFTS_ICE_CREAM
+            item_data = rows.get(item, {})
+
+            # Spreadsheet formulas (use USER_ENTERED so Sheets evaluates them).
+            expected_formula = (
+                f"={s_col}{row_num}+{d_col}{row_num}"
+                f"-{sa_col}{row_num}-{sp_col}{row_num}"
+            )
+            variance_formula = (
+                f'=IF({ac_col}{row_num}="",'
+                f'"",{ac_col}{row_num}-{ex_col}{row_num})'
+            )
+
+            row_values = [
+                item_data.get("starting", 0),
+                item_data.get("deliveries", 0),
+                item_data.get("sales", 0),
+                item_data.get("spoilage", 0),
+                expected_formula,
+                "",                                            # Actual (user fills in)
+                variance_formula,
+                item_data.get("scoops_used", 0) if is_tofts else "",
+                item_data.get("tubs_used", 0)   if is_tofts else "",
+            ]
+
+            batch_data.append({
+                "range": f"'{stand_name}'!{s_col}{row_num}:{tu_col}{row_num}",
+                "values": [row_values],
+            })
+
+    if batch_data:
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"valueInputOption": "USER_ENTERED", "data": batch_data},
+        ).execute()
+
+    # ============================
+    # FORMATTING FOR THIS WEEK'S COLUMNS
+    # ============================
+    fmt_requests = []
+
+    week_start_idx = next_week_start          # 0-based
+    week_end_idx   = next_week_start + COLS_PER_WEEK  # exclusive
+
+    # Merge week label across all 9 columns in row 1.
+    fmt_requests.append({
+        "mergeCells": {
             "range": {
                 "sheetId": sheet_id,
-                "dimension": "COLUMNS",
-                "startIndex": 0,
-                "endIndex": 11
+                "startRowIndex": 0, "endRowIndex": 1,
+                "startColumnIndex": week_start_idx, "endColumnIndex": week_end_idx,
             },
-            "properties": {"pixelSize": 140},
-            "fields": "pixelSize"
+            "mergeType": "MERGE_ALL",
         }
     })
 
-    # Header row: blue background, white bold text, centered
-    requests.append({
+    # Row 1 (week label): blue background, white bold centred text.
+    fmt_requests.append({
         "repeatCell": {
             "range": {
                 "sheetId": sheet_id,
-                "startRowIndex": 0,
-                "endRowIndex": 1,
-                "startColumnIndex": 0,
-                "endColumnIndex": 11
+                "startRowIndex": 0, "endRowIndex": 1,
+                "startColumnIndex": week_start_idx, "endColumnIndex": week_end_idx,
             },
             "cell": {
                 "userEnteredFormat": {
                     "backgroundColor": {"red": 0.267, "green": 0.447, "blue": 0.769},
-                    "textFormat": {"bold": True, "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
-                    "horizontalAlignment": "CENTER"
+                    "textFormat": {
+                        "bold": True,
+                        "foregroundColor": {"red": 1, "green": 1, "blue": 1},
+                    },
+                    "horizontalAlignment": "CENTER",
                 }
             },
-            "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)"
+            "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
         }
     })
 
-    # Category rows: light blue background, bold text
-    category_names_set = {cat for cat, _ in CATEGORY_ORDER}
-    for i, row in enumerate(output_rows):
-        if isinstance(row, list) and len(row) >= 2 and row[0] in category_names_set and row[1] == "":
-            requests.append({
+    # Row 2 (sub-headers): same blue style.
+    fmt_requests.append({
+        "repeatCell": {
+            "range": {
+                "sheetId": sheet_id,
+                "startRowIndex": 1, "endRowIndex": 2,
+                "startColumnIndex": week_start_idx, "endColumnIndex": week_end_idx,
+            },
+            "cell": {
+                "userEnteredFormat": {
+                    "backgroundColor": {"red": 0.267, "green": 0.447, "blue": 0.769},
+                    "textFormat": {
+                        "bold": True,
+                        "foregroundColor": {"red": 1, "green": 1, "blue": 1},
+                    },
+                    "horizontalAlignment": "CENTER",
+                }
+            },
+            "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
+        }
+    })
+
+    # Category rows: light-blue background for this week's new columns.
+    for category_name, item_list in CATEGORY_ORDER:
+        cat_row = item_row_map.get(category_name)
+        if cat_row:
+            fmt_requests.append({
                 "repeatCell": {
                     "range": {
                         "sheetId": sheet_id,
-                        "startRowIndex": i,
-                        "endRowIndex": i + 1,
-                        "startColumnIndex": 0,
-                        "endColumnIndex": 11
+                        "startRowIndex": cat_row - 1, "endRowIndex": cat_row,
+                        "startColumnIndex": week_start_idx, "endColumnIndex": week_end_idx,
                     },
                     "cell": {
                         "userEnteredFormat": {
                             "backgroundColor": {"red": 0.647, "green": 0.761, "blue": 0.902},
-                            "textFormat": {"bold": True}
+                            "textFormat": {"bold": True},
                         }
                     },
-                    "fields": "userEnteredFormat(backgroundColor,textFormat)"
+                    "fields": "userEnteredFormat(backgroundColor,textFormat)",
                 }
             })
 
-    # Conditional formatting: green for positive variance, red for negative
-    variance_col_idx = header.index("VARIANCE")
+    # Conditional formatting: green/red on Variance column.
+    total_data_rows = DATA_START_ROW - 1
+    for _, item_list in CATEGORY_ORDER:
+        total_data_rows += 1 + len(item_list)
+
+    variance_col_idx = next_week_start + COL_VARIANCE
     variance_range = [{
         "sheetId": sheet_id,
-        "startRowIndex": 1,
-        "endRowIndex": len(output_rows),
+        "startRowIndex": DATA_START_ROW - 1,
+        "endRowIndex": total_data_rows,
         "startColumnIndex": variance_col_idx,
-        "endColumnIndex": variance_col_idx + 1
+        "endColumnIndex": variance_col_idx + 1,
     }]
-    requests.append({
+
+    fmt_requests.append({
         "addConditionalFormatRule": {
             "rule": {
                 "ranges": variance_range,
                 "booleanRule": {
-                    "condition": {"type": "NUMBER_GREATER", "values": [{"userEnteredValue": "0"}]},
-                    "format": {"backgroundColor": {"red": 0.576, "green": 0.769, "blue": 0.490}}
+                    "condition": {
+                        "type": "NUMBER_GREATER",
+                        "values": [{"userEnteredValue": "0"}],
+                    },
+                    "format": {
+                        "backgroundColor": {"red": 0.576, "green": 0.769, "blue": 0.490}
+                    },
                 }
             },
-            "index": 0
+            "index": 0,
         }
     })
-    # Conditional formatting: red for negative variance
-    requests.append({
+    fmt_requests.append({
         "addConditionalFormatRule": {
             "rule": {
                 "ranges": variance_range,
                 "booleanRule": {
-                    "condition": {"type": "NUMBER_LESS", "values": [{"userEnteredValue": "0"}]},
-                    "format": {"backgroundColor": {"red": 0.918, "green": 0.267, "blue": 0.208}}
+                    "condition": {
+                        "type": "NUMBER_LESS",
+                        "values": [{"userEnteredValue": "0"}],
+                    },
+                    "format": {
+                        "backgroundColor": {"red": 0.918, "green": 0.267, "blue": 0.208}
+                    },
                 }
             },
-            "index": 1
+            "index": 1,
         }
     })
 
-    # ------------------------------------------------------------
-    # APPLY FORMATTING
-    # ------------------------------------------------------------
+    # Set column widths for the new week's block.
+    fmt_requests.append({
+        "updateDimensionProperties": {
+            "range": {
+                "sheetId": sheet_id,
+                "dimension": "COLUMNS",
+                "startIndex": week_start_idx,
+                "endIndex": week_end_idx,
+            },
+            "properties": {"pixelSize": 120},
+            "fields": "pixelSize",
+        }
+    })
+
     service.spreadsheets().batchUpdate(
         spreadsheetId=spreadsheet_id,
-        body={"requests": requests}
+        body={"requests": fmt_requests},
     ).execute()
+
+    print(f"✅ Week '{week_label}' written to '{stand_name}' "
+          f"(columns {week_start_letter}–{week_end_letter}).")
 
 
 
