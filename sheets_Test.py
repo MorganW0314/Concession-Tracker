@@ -2,7 +2,6 @@ import os
 import glob 
 from Take_items import take_items   # your CSV ingestion function
 from Call_sheets import write_full_week
-from Call_sheets import create_weekly_sheet
 from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
 
@@ -85,21 +84,17 @@ sheet = service.spreadsheets()
 # ------------------------------------------------------------
 # 1. READ CSV → rows dict
 # ------------------------------------------------------------
-print(f"Reading purchases_{stand_name}.csv from Downloads...")
+print(f"Reading {os.path.basename(csv_file)}...")
 rows = take_items(csv_file)
 print("Parsed rows:")
 print(rows)
 
 # ------------------------------------------------------------
-# 2. CREATE WEEKLY SHEET TAB
-# ------------------------------------------------------------
-new_sheet_name = create_weekly_sheet(service, SPREADSHEET_ID, stand_name)
-
-# ------------------------------------------------------------
-# 3. WRITE FULL WEEK SHEET
+# 2. APPEND THIS WEEK'S COLUMNS TO THE STAND'S SHEET
+#    (creates the sheet automatically on the first run)
 # ------------------------------------------------------------
 print("Writing formatted sheet...")
-write_full_week(sheet, service, SPREADSHEET_ID, new_sheet_name, rows, stand_name)
+write_full_week(sheet, service, SPREADSHEET_ID, stand_name, rows)
 
-print("Done — check your new weekly tab!")
+print("Done — check the", stand_name, "tab!")
 
