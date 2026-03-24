@@ -408,6 +408,7 @@ def get_values(sheet, spreadsheet_id, range_string):
 
 def read_deliveries(sheet, spreadsheet_id, stand_name):
     """Read the Deliveries - {stand} tab and accumulate deliveries per item.
+    
 
     Tab format (row 1 = header, rows 2+ = data):
       A: DATE  (optional, for record-keeping)
@@ -417,8 +418,18 @@ def read_deliveries(sheet, spreadsheet_id, stand_name):
 
     Quantities are ACCUMULATED so multiple deliveries in one week are summed.
     """
+
     tab = f"Deliveries-{stand_name}"
-    rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A2:D200")
+    range_str = f"'{tab}'!A2:D200"
+    print(f"Stand name: '{stand_name}'")
+    print(f"Tab name: '{tab}'")
+    print(f"Range: '{range_str}'")
+    rows = get_values(sheet, spreadsheet_id, range_str)
+
+    
+    tab = f"Deliveries-{stand_name}"
+    range_str = f"'{tab}'!A2:D200"
+    rows = get_values(sheet, spreadsheet_id, range_str)
 
     deliveries = {}
 
@@ -457,12 +468,8 @@ def read_spoilage(sheet, spreadsheet_id, stand_name):
     Quantities are ACCUMULATED across all rows for the week.
     """
     tab = f"Spoilage-{stand_name}"
-    try:
-        rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A2:C200")
-    except Exception as e:
-        print(f"Warning: Could not read spoilage sheet '{tab}'. Starting with no spoilage data.")
-        return {}
-
+    range_str = f"{tab}!A2:C200"
+    rows = get_values(sheet, spreadsheet_id, range_str)
     spoilage = {}
 
     for row in rows:
@@ -487,15 +494,11 @@ def read_spoilage(sheet, spreadsheet_id, stand_name):
 def clear_spoilage_sheet(sheet, spreadsheet_id, stand_name):
     """Clear all data rows from the Spoilage sheet after reading."""
     tab = f"Spoilage-{stand_name}"
-    try:
-        # Delete rows 2 onwards (keep header in row 1)
-        sheet.values().clear(
-            spreadsheetId=spreadsheet_id,
-            range=f"'{tab}'!A2:C1000"
-        ).execute()
-        print(f"Cleared spoilage data from {tab}")
-    except Exception as e:
-        print(f"Could not clear spoilage sheet: {e}")
+    range_str = f"{tab}!A2:C1000"
+    sheet.values().clear(
+        spreadsheetId=spreadsheet_id,
+        range=range_str
+    ).execute()
 
 def read_master_items(sheet, spreadsheet_id, stand_name):
     """Read the Master Items - {stand} tab and return a list of (category, item) tuples.
