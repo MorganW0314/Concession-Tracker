@@ -21,24 +21,36 @@ def get_sheet_id(service, spreadsheet_id, sheet_name):
 # Horizontal-week layout constants
 # ---------------------------------------------------------------------------
 # Each week occupies this many columns to the right of Column A.
-COLS_PER_WEEK = 9
+# Layout: Starting | Deliveries | Sales | Spoilage | Expected |
+#         Individuals | Cases/Packs | Qty Per Case | Actual | Variance |
+#         Scoops Used | Tubs Used
+COLS_PER_WEEK = 12
 
 # Sub-header labels written in row 2 for every week block.
 WEEK_COL_HEADERS = [
     "Starting", "Deliveries", "Sales", "Spoilage",
-    "Expected", "Actual", "Variance", "Scoops Used", "Tubs Used",
+    "Expected", "Individuals", "Cases/Packs", "Qty Per Case",
+    "Actual", "Variance", "Scoops Used", "Tubs Used",
 ]
 
 # 0-based offsets within a week's column block.
-COL_STARTING   = 0
-COL_DELIVERIES = 1
-COL_SALES      = 2
-COL_SPOILAGE   = 3
-COL_EXPECTED   = 4
-COL_ACTUAL     = 5
-COL_VARIANCE   = 6
-COL_SCOOPS     = 7
-COL_TUBS       = 8
+COL_STARTING     = 0
+COL_DELIVERIES   = 1
+COL_SALES        = 2
+COL_SPOILAGE     = 3
+COL_EXPECTED     = 4
+# IN PERSON COUNT helper columns (employees fill these in during manual counts)
+COL_INDIVIDUALS  = 5
+COL_CASES        = 6
+COL_QTY_PER_CASE = 7
+# Actual is now a formula: =Individuals + Cases/Packs * Qty Per Case
+COL_ACTUAL       = 8
+COL_VARIANCE     = 9
+COL_SCOOPS       = 10
+COL_TUBS         = 11
+
+# Label written in row 1 over the three in-person count helper columns.
+IN_PERSON_COUNT_LABEL = "IN PERSON COUNT"
 
 # Fixed row numbers (1-indexed) in every stand sheet.
 HEADER_ROW    = 1   # Week-label row  (e.g. "Week of 03-23-2026")
@@ -74,7 +86,10 @@ def find_last_week_start_col(sheet, spreadsheet_id, sheet_name):
     row = (result.get("values") or [[]])[0]
     last_week_start = 0
     for i in range(1, len(row)):   # skip col A (index 0)
-        if row[i]:
+        # Only treat cells that start with "Week of" as week-label columns.
+        # This prevents the new "IN PERSON COUNT" label (written into the same
+        # row for the helper columns) from being mistaken as a week start.
+        if row[i] and str(row[i]).startswith("Week of"):
             last_week_start = i
     return last_week_start
 
@@ -302,10 +317,10 @@ UNIT_CONVERSION = {
     "Cookie Dough Double Scoop": 2,
     "Cookie Dough Triple Scoop": 3,
 
-    # Cotton Candy
-    "Cotton Candy": 1,
-    "Cotton Candy Double Scoop": 2,
-    "Cotton Candy Triple Scoop": 3,
+    # Cotton Candy Ice Cream (distinct from Cotton Candy candy)
+    "Cotton Candy Ice Cream": 1,
+    "Cotton Candy Ice Cream Double Scoop": 2,
+    "Cotton Candy Ice Cream Triple Scoop": 3,
 
     # Cookie Monster
     "Cookie Monster": 1,
@@ -530,6 +545,167 @@ def read_master_items(sheet, spreadsheet_id, stand_name):
             items.append((category, item))
 
     return items if items else None
+
+
+# ---------------------------------------------------------------------------
+# Master Items lookup (global "Master Items" tab, not per-stand)
+# ---------------------------------------------------------------------------
+
+def load_master_items(sheet, spreadsheet_id):
+    """Read the global 'Master Items' tab and return a lookup dictionary.
+
+    Tab format (row 1 = header, rows 2+ = data):
+      A: CATEGORY
+      B: ITEM NAME
+      C: INGREDIENT / COMPONENT MAP  (human-readable text, e.g. "1 Bun, 1 Hot Dog")
+
+    Returns a dict keyed by exact item name:
+      { item_name: {"category": str, "ingredients": str} }
+
+    Returns an empty dict if the tab is absent or empty.
+    """
+    try:
+        rows = get_values(sheet, spreadsheet_id, "'Master Items'!A2:C500")
+    except Exception:
+        return {}
+
+    master = {}
+    for row in rows:
+        if len(row) < 2:
+            continue
+        category      = row[0].strip() if row[0] else ""
+        item_name     = row[1].strip() if row[1] else ""
+        ingredient_txt = row[2].strip() if len(row) > 2 and row[2] else ""
+        if item_name:
+            master[item_name] = {"category": category, "ingredients": ingredient_txt}
+    return master
+
+
+def map_item_to_ingredients(item_name, quantity, ingredient_map=None):
+    """Convert a sold item + quantity to a dict of ingredient components.
+
+    Uses INGREDIENT_MAP by default.  Returns {ingredient_name: total_qty}.
+    Items not present in the ingredient_map are returned as-is
+    ({item_name: quantity}).
+    """
+    if ingredient_map is None:
+        ingredient_map = INGREDIENT_MAP
+
+    if item_name not in ingredient_map:
+        return {item_name: quantity}
+
+    result = {}
+    for ing_name, qty_per_sale in ingredient_map[item_name]:
+        result[ing_name] = result.get(ing_name, 0) + quantity * qty_per_sale
+    return result
+
+
+def calculate_ingredients_per_stand(rows, ingredient_map=None):
+    """Expand CSV sales into ingredient-level usage for a single stand.
+
+    For each item that has an entry in INGREDIENT_MAP, the additional
+    ingredient items it consumes are computed from the item's sales count
+    and added (accumulated) into *rows*.
+
+    The original item's own row is left untouched – it continues to show
+    the raw number of that item sold.  Only the derived ingredient rows
+    (e.g. "Bun", "Chili (1oz scoop)") are created/updated here.
+
+    This function modifies *rows* in-place and also returns it.
+    """
+    if ingredient_map is None:
+        ingredient_map = INGREDIENT_MAP
+
+    for sold_item, ingredient_list in ingredient_map.items():
+        qty_sold = rows.get(sold_item, {}).get("sales", 0)
+        if qty_sold <= 0:
+            continue
+
+        for ingredient_name, qty_per_sale in ingredient_list:
+            if ingredient_name not in rows:
+                rows[ingredient_name] = {
+                    "starting": 0, "deliveries": 0, "sales": 0,
+                    "spoilage": 0, "scoops_used": 0, "tubs_used": 0,
+                    "expected": 0, "actual": "",
+                }
+            rows[ingredient_name]["sales"] += qty_sold * qty_per_sale
+
+    return rows
+
+
+def create_master_items_tab(service, spreadsheet_id):
+    """Create and populate the global 'Master Items' tab if it does not exist.
+
+    The tab is created with three columns:
+      A: CATEGORY | B: ITEM NAME | C: INGREDIENT / COMPONENT MAP
+
+    All items from DEFAULT_CATEGORY_ORDER are written in.  Items that appear
+    in INGREDIENT_MAP have their ingredient text auto-generated.
+
+    Returns the integer sheetId (existing or newly created).
+    """
+    tab_name = "Master Items"
+
+    # Return early if the tab already exists.
+    metadata = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    for s in metadata.get("sheets", []):
+        if s["properties"]["title"] == tab_name:
+            return s["properties"]["sheetId"]
+
+    # Create the tab.
+    response = service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={"requests": [{
+            "addSheet": {
+                "properties": {
+                    "title": tab_name,
+                    "gridProperties": {"rowCount": 500, "columnCount": 5},
+                }
+            }
+        }]},
+    ).execute()
+    new_sheet_id = response["replies"][0]["addSheet"]["properties"]["sheetId"]
+
+    # Build row data: header + one row per item.
+    tab_rows = [["CATEGORY", "ITEM NAME", "INGREDIENT / COMPONENT MAP"]]
+
+    for category_name, item_list in DEFAULT_CATEGORY_ORDER:
+        for item in sorted(item_list):
+            ingredient_text = ""
+            if item in INGREDIENT_MAP:
+                parts = [f"{qty} {ing}" for ing, qty in INGREDIENT_MAP[item]]
+                ingredient_text = ", ".join(parts)
+            tab_rows.append([category_name, item, ingredient_text])
+
+    service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{tab_name}'!A1",
+        valueInputOption="RAW",
+        body={"values": tab_rows},
+    ).execute()
+
+    # Bold the header row.
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={"requests": [{
+            "repeatCell": {
+                "range": {
+                    "sheetId": new_sheet_id,
+                    "startRowIndex": 0, "endRowIndex": 1,
+                    "startColumnIndex": 0, "endColumnIndex": 3,
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "textFormat": {"bold": True},
+                        "backgroundColor": {"red": 0.267, "green": 0.447, "blue": 0.769},
+                    }
+                },
+                "fields": "userEnteredFormat(textFormat,backgroundColor)",
+            }
+        }]},
+    ).execute()
+
+    return new_sheet_id
 
 
 def read_sales(sheet, spreadsheet_id, sheet_name):
@@ -768,7 +944,9 @@ TOFTS_ICE_CREAM = [
     "Chocolate",
     "Cookie Dough",
     "Cookies & Cream",
-    "Cotton Candy",
+    # Named "Cotton Candy Ice Cream" to distinguish from the Cotton Candy
+    # candy product sold separately (which remains "Cotton Candy" in CANDY).
+    "Cotton Candy Ice Cream",
     "Cookie Monster",
     "Peanut Butter Cup",
     "Strawberry Cheesecake",
@@ -831,6 +1009,7 @@ MEALS = [
         "Hot Dog",
         "Pizza Slice",
         "Pulled Pork Nachos",
+        "Pulled Pork Sandwich",
         "Uncrustable",
         "Walking Taco",
         "Cup of Cheese",
@@ -886,8 +1065,71 @@ JANITORIAL = [
     
     ]
 
-SNOW_CONE_AND_FOUNTAIN_SYRUPS = SYRUPS + BIB_SYRUPS 
-# Combine all category lists
+SNOW_CONE_AND_FOUNTAIN_SYRUPS = SYRUPS + BIB_SYRUPS
+
+# ---------------------------------------------------------------------------
+# Ingredient / component items
+# These are physical inventory items derived from meal sales via INGREDIENT_MAP.
+# They do not appear in the POS CSV; their "sales" values are computed by
+# calculate_ingredients_per_stand().
+# ---------------------------------------------------------------------------
+INGREDIENTS = [
+    "Bun",
+    "Chili (1oz scoop)",
+    "Pulled Pork (1oz scoop)",
+]
+
+# ---------------------------------------------------------------------------
+# Ingredient map
+# Maps each sold menu item (CSV "Item Name") to a list of
+# (ingredient_name, qty_per_sale) tuples.
+#
+# The sold item's own row is left unchanged; only the listed ingredients
+# are added to (accumulated in) the rows dict.
+#
+# Ice cream scoop items are handled separately via group_scoops_by_flavor /
+# UNIT_CONVERSION and do NOT need entries here.
+# ---------------------------------------------------------------------------
+INGREDIENT_MAP = {
+    # Hot Dog: frank is tracked under "Hot Dog"; also consume 1 bun.
+    "Hot Dog": [("Bun", 1)],
+
+    # Chili Cheese Dog: dog is tracked under "Chili Cheese Dog";
+    # also consume 1 bun + 1 oz-ladle scoop of chili.
+    "Chili Cheese Dog": [("Bun", 1), ("Chili (1oz scoop)", 1)],
+
+    # Walking Taco: 1 bag of Assorted Chips + 2 oz-ladle scoops of chili.
+    "Walking Taco": [("Assorted Chips", 1), ("Chili (1oz scoop)", 2)],
+
+    # Chili Cheese Nachos: 3 oz-ladle scoops of chili.
+    "Chili Cheese Nachos": [("Chili (1oz scoop)", 3)],
+
+    # Pulled Pork Nachos: 3 oz-ladle scoops of pulled pork.
+    "Pulled Pork Nachos": [("Pulled Pork (1oz scoop)", 3)],
+
+    # Pulled Pork Sandwich: sandwich is tracked; also 1 bun + 1 scoop pulled pork.
+    "Pulled Pork Sandwich": [("Bun", 1), ("Pulled Pork (1oz scoop)", 1)],
+
+    # BBQ Pork Sandwich: same as Pulled Pork Sandwich (alternative CSV name).
+    "BBQ Pork Sandwich": [("Bun", 1), ("Pulled Pork (1oz scoop)", 1)],
+}
+
+# ---------------------------------------------------------------------------
+# Default category order (used when no stand-specific Master Items tab exists)
+# ---------------------------------------------------------------------------
+DEFAULT_CATEGORY_ORDER = [
+    ("ICE CREAM (Toft's Scoops)", TOFTS_ICE_CREAM),
+    ("NOVELTY ICE CREAM", NOVELTY_ICE_CREAM),
+    ("CANDY", CANDY),
+    ("DRINKS", DRINKS),
+    ("MEALS", MEALS),
+    ("SNACKS", SNACKS),
+    ("INGREDIENTS / COMPONENTS", INGREDIENTS),
+    ("SNOW CONES / SYRUPS", SNOW_CONE_AND_FOUNTAIN_SYRUPS),
+    ("JANITORIAL / CONSUMABLES", JANITORIAL),
+]
+
+# Combine all category lists (for reference / legacy use)
 all_categories = {
     "TOFTS_ICE_CREAM": TOFTS_ICE_CREAM,
     "NOVELTY_ICE_CREAM": NOVELTY_ICE_CREAM,
@@ -895,6 +1137,7 @@ all_categories = {
     "DRINKS": DRINKS,
     "MEALS": MEALS,
     "SNACKS": SNACKS,
+    "INGREDIENTS": INGREDIENTS,
     "JANITORIAL": JANITORIAL,
     "SNOW_CONE_AND_FOUNTAIN_SYRUPS": SNOW_CONE_AND_FOUNTAIN_SYRUPS
 }
@@ -978,27 +1221,34 @@ def find_previous_week_sheet_name(service, spreadsheet_id, current_sheet_name, s
 
 
 def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
-    """Append one week's inventory data as 9 new columns to the stand's sheet.
+    """Append one week's inventory data as 12 new columns to the stand's sheet.
 
     Sheet layout
     ------------
     * Column A  – static item list (category headers + sorted item names).
-    * Row 1     – week-label row: "Week of MM-DD-YYYY" in the first column of
-                  each week's block; Column A always contains "ITEM".
+    * Row 1     – week-label row:
+                    • "Week of MM-DD-YYYY" merged over the first 5 columns
+                      (Starting → Expected) of each week's block.
+                    • "IN PERSON COUNT" merged over the 3 helper columns
+                      (Individuals, Cases/Packs, Qty Per Case).
+                    • Remaining columns (Actual → Tubs) are visually grouped
+                      with the week label background but left blank.
+                    • Column A always contains "ITEM".
     * Row 2     – sub-header row: Starting | Deliveries | Sales | Spoilage |
-                  Expected | Actual | Variance | Scoops Used | Tubs Used
+                  Expected | Individuals | Cases/Packs | Qty Per Case |
+                  Actual | Variance | Scoops Used | Tubs Used
                   repeated for every week block; Column A is blank.
     * Row 3+    – data rows: one row per category header or item.
 
     On the first run the stand sheet is created automatically.  Subsequent
-    runs detect the last week via the week labels in row 1 and append 9 more
+    runs detect the last week via the week labels in row 1 and append 12 more
     columns to the right — no new sheet tabs are created.
     """
 
     # ============================
     # CATEGORY ORDER
-    # Try to read from "Master Items-{stand}" tab first; fall back to hardcoded
-    # lists.
+    # Try to read from "Master Items-{stand}" tab first; fall back to
+    # DEFAULT_CATEGORY_ORDER (which includes INGREDIENTS / COMPONENTS).
     # ============================
     master_items = read_master_items(sheet, spreadsheet_id, stand_name)
 
@@ -1011,16 +1261,15 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
             category_map[category].append(item)
         CATEGORY_ORDER = list(category_map.items())
     else:
-        CATEGORY_ORDER = [
-            ("ICE CREAM (Toft's Scoops)", TOFTS_ICE_CREAM),
-            ("NOVELTY ICE CREAM", NOVELTY_ICE_CREAM),
-            ("CANDY", CANDY),
-            ("DRINKS", DRINKS),
-            ("MEALS", MEALS),
-            ("SNACKS", SNACKS),
-            ("SNOW CONES / SYRUPS", SNOW_CONE_AND_FOUNTAIN_SYRUPS),
-            ("JANITORIAL / CONSUMABLES", JANITORIAL),
-        ]
+        CATEGORY_ORDER = DEFAULT_CATEGORY_ORDER
+
+    # ============================
+    # INGREDIENT-BASED SALES EXPANSION (per-stand, not consolidated)
+    # Must run BEFORE the "ensure all items appear" loop so that computed
+    # ingredient rows (Bun, Chili scoop, etc.) are in `rows` when that
+    # loop checks them.
+    # ============================
+    calculate_ingredients_per_stand(rows)
 
     # ============================
     # ENSURE STAND SHEET EXISTS (creates it with items in col A if absent)
@@ -1119,15 +1368,28 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     week_start_letter = col_letter(next_week_start)
     week_end_letter   = col_letter(next_week_start + COLS_PER_WEEK - 1)
 
-    # Row 1: week label in first column of this week's block only.
-    service.spreadsheets().values().update(
+    # Row 1 – write the week label into the first column of this week's block
+    # and write "IN PERSON COUNT" into the first helper column so Google Sheets
+    # has the values for the two merged regions (see formatting below).
+    in_person_start_letter = col_letter(next_week_start + COL_INDIVIDUALS)
+    service.spreadsheets().values().batchUpdate(
         spreadsheetId=spreadsheet_id,
-        range=f"'{stand_name}'!{week_start_letter}{HEADER_ROW}",
-        valueInputOption="RAW",
-        body={"values": [[week_label]]},
+        body={
+            "valueInputOption": "RAW",
+            "data": [
+                {
+                    "range": f"'{stand_name}'!{week_start_letter}{HEADER_ROW}",
+                    "values": [[week_label]],
+                },
+                {
+                    "range": f"'{stand_name}'!{in_person_start_letter}{HEADER_ROW}",
+                    "values": [[IN_PERSON_COUNT_LABEL]],
+                },
+            ],
+        },
     ).execute()
 
-    # Row 2: all nine sub-headers.
+    # Row 2: all twelve sub-headers.
     service.spreadsheets().values().update(
         spreadsheetId=spreadsheet_id,
         range=f"'{stand_name}'!{week_start_letter}{SUBHEADER_ROW}",
@@ -1139,15 +1401,18 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     # WRITE ITEM DATA ROW BY ROW
     # ============================
     # Pre-compute column letters for this week block (same for every row).
-    s_col  = col_letter(next_week_start + COL_STARTING)
-    d_col  = col_letter(next_week_start + COL_DELIVERIES)
-    sa_col = col_letter(next_week_start + COL_SALES)
-    sp_col = col_letter(next_week_start + COL_SPOILAGE)
-    ex_col = col_letter(next_week_start + COL_EXPECTED)
-    ac_col = col_letter(next_week_start + COL_ACTUAL)
-    va_col = col_letter(next_week_start + COL_VARIANCE)
-    sc_col = col_letter(next_week_start + COL_SCOOPS)
-    tu_col = col_letter(next_week_start + COL_TUBS)
+    s_col   = col_letter(next_week_start + COL_STARTING)
+    d_col   = col_letter(next_week_start + COL_DELIVERIES)
+    sa_col  = col_letter(next_week_start + COL_SALES)
+    sp_col  = col_letter(next_week_start + COL_SPOILAGE)
+    ex_col  = col_letter(next_week_start + COL_EXPECTED)
+    ind_col = col_letter(next_week_start + COL_INDIVIDUALS)
+    cas_col = col_letter(next_week_start + COL_CASES)
+    qty_col = col_letter(next_week_start + COL_QTY_PER_CASE)
+    ac_col  = col_letter(next_week_start + COL_ACTUAL)
+    va_col  = col_letter(next_week_start + COL_VARIANCE)
+    sc_col  = col_letter(next_week_start + COL_SCOOPS)
+    tu_col  = col_letter(next_week_start + COL_TUBS)
 
     batch_data = []
 
@@ -1165,21 +1430,32 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
                 f"={s_col}{row_num}+{d_col}{row_num}"
                 f"-{sa_col}{row_num}-{sp_col}{row_num}"
             )
+            # Actual = Individuals + Cases/Packs × Qty Per Case.
+            # Returns blank until at least one helper column is filled in.
+            actual_formula = (
+                f'=IF(AND({ind_col}{row_num}="",'
+                f'{cas_col}{row_num}=""),"",IFERROR('
+                f'{ind_col}{row_num}+{cas_col}{row_num}*{qty_col}{row_num},"")'
+                f')'
+            )
             variance_formula = (
                 f'=IF({ac_col}{row_num}="",'
                 f'"",{ac_col}{row_num}-{ex_col}{row_num})'
             )
 
             row_values = [
-                item_data.get("starting", 0),
-                item_data.get("deliveries", 0),
-                item_data.get("sales", 0),
-                item_data.get("spoilage", 0),
-                expected_formula,
-                "",                                            # Actual (user fills in)
-                variance_formula,
-                item_data.get("scoops_used", 0) if is_tofts else "",
-                item_data.get("tubs_used", 0)   if is_tofts else "",
+                item_data.get("starting", 0),       # Starting
+                item_data.get("deliveries", 0),      # Deliveries
+                item_data.get("sales", 0),           # Sales
+                item_data.get("spoilage", 0),        # Spoilage
+                expected_formula,                    # Expected (formula)
+                "",                                  # Individuals   (employee fills in)
+                "",                                  # Cases/Packs   (employee fills in)
+                "",                                  # Qty Per Case  (employee fills in)
+                actual_formula,                      # Actual = Ind + Cases×Qty
+                variance_formula,                    # Variance = Actual − Expected
+                item_data.get("scoops_used", 0) if is_tofts else "",  # Scoops Used
+                item_data.get("tubs_used", 0)   if is_tofts else "",  # Tubs Used
             ]
 
             batch_data.append({
@@ -1198,28 +1474,100 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     # ============================
     fmt_requests = []
 
-    week_start_idx = next_week_start          # 0-based
-    week_end_idx   = next_week_start + COLS_PER_WEEK  # exclusive
+    week_start_idx = next_week_start                      # 0-based
+    week_end_idx   = next_week_start + COLS_PER_WEEK      # exclusive
+    inpc_start_idx = next_week_start + COL_INDIVIDUALS    # first helper col
+    inpc_end_idx   = next_week_start + COL_INDIVIDUALS + 3  # exclusive (3 helper cols)
+    rest_start_idx = inpc_end_idx                         # Actual … Tubs
 
-    # Merge week label across all 9 columns in row 1.
+    # --- Row 1 merges ---
+    # Merge 1: week label over cols 0-4 (Starting through Expected).
     fmt_requests.append({
         "mergeCells": {
             "range": {
                 "sheetId": sheet_id,
                 "startRowIndex": 0, "endRowIndex": 1,
-                "startColumnIndex": week_start_idx, "endColumnIndex": week_end_idx,
+                "startColumnIndex": week_start_idx,
+                "endColumnIndex": inpc_start_idx,
+            },
+            "mergeType": "MERGE_ALL",
+        }
+    })
+    # Merge 2: "IN PERSON COUNT" label over the 3 helper columns.
+    fmt_requests.append({
+        "mergeCells": {
+            "range": {
+                "sheetId": sheet_id,
+                "startRowIndex": 0, "endRowIndex": 1,
+                "startColumnIndex": inpc_start_idx,
+                "endColumnIndex": inpc_end_idx,
+            },
+            "mergeType": "MERGE_ALL",
+        }
+    })
+    # Merge 3: remaining columns (Actual → Tubs) blank merged region.
+    fmt_requests.append({
+        "mergeCells": {
+            "range": {
+                "sheetId": sheet_id,
+                "startRowIndex": 0, "endRowIndex": 1,
+                "startColumnIndex": rest_start_idx,
+                "endColumnIndex": week_end_idx,
             },
             "mergeType": "MERGE_ALL",
         }
     })
 
-    # Row 1 (week label): blue background, white bold centred text.
+    # --- Row 1 background colours ---
+    # Week label section: blue
     fmt_requests.append({
         "repeatCell": {
             "range": {
                 "sheetId": sheet_id,
                 "startRowIndex": 0, "endRowIndex": 1,
-                "startColumnIndex": week_start_idx, "endColumnIndex": week_end_idx,
+                "startColumnIndex": week_start_idx, "endColumnIndex": inpc_start_idx,
+            },
+            "cell": {
+                "userEnteredFormat": {
+                    "backgroundColor": {"red": 0.267, "green": 0.447, "blue": 0.769},
+                    "textFormat": {
+                        "bold": True,
+                        "foregroundColor": {"red": 1, "green": 1, "blue": 1},
+                    },
+                    "horizontalAlignment": "CENTER",
+                }
+            },
+            "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
+        }
+    })
+    # IN PERSON COUNT section: orange
+    fmt_requests.append({
+        "repeatCell": {
+            "range": {
+                "sheetId": sheet_id,
+                "startRowIndex": 0, "endRowIndex": 1,
+                "startColumnIndex": inpc_start_idx, "endColumnIndex": inpc_end_idx,
+            },
+            "cell": {
+                "userEnteredFormat": {
+                    "backgroundColor": {"red": 0.949, "green": 0.580, "blue": 0.118},
+                    "textFormat": {
+                        "bold": True,
+                        "foregroundColor": {"red": 1, "green": 1, "blue": 1},
+                    },
+                    "horizontalAlignment": "CENTER",
+                }
+            },
+            "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
+        }
+    })
+    # Remaining section (Actual → Tubs): blue, matching week label
+    fmt_requests.append({
+        "repeatCell": {
+            "range": {
+                "sheetId": sheet_id,
+                "startRowIndex": 0, "endRowIndex": 1,
+                "startColumnIndex": rest_start_idx, "endColumnIndex": week_end_idx,
             },
             "cell": {
                 "userEnteredFormat": {
@@ -1235,17 +1583,43 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
         }
     })
 
-    # Row 2 (sub-headers): same blue style.
+    # --- Row 2 (sub-headers) ---
+    # Columns 0-4 and 8-11: standard blue.
+    for col_range in [
+        (week_start_idx, inpc_start_idx),
+        (rest_start_idx, week_end_idx),
+    ]:
+        fmt_requests.append({
+            "repeatCell": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": 1, "endRowIndex": 2,
+                    "startColumnIndex": col_range[0], "endColumnIndex": col_range[1],
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "backgroundColor": {"red": 0.267, "green": 0.447, "blue": 0.769},
+                        "textFormat": {
+                            "bold": True,
+                            "foregroundColor": {"red": 1, "green": 1, "blue": 1},
+                        },
+                        "horizontalAlignment": "CENTER",
+                    }
+                },
+                "fields": "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
+            }
+        })
+    # Columns 5-7 (helper columns): orange to match IN PERSON COUNT header.
     fmt_requests.append({
         "repeatCell": {
             "range": {
                 "sheetId": sheet_id,
                 "startRowIndex": 1, "endRowIndex": 2,
-                "startColumnIndex": week_start_idx, "endColumnIndex": week_end_idx,
+                "startColumnIndex": inpc_start_idx, "endColumnIndex": inpc_end_idx,
             },
             "cell": {
                 "userEnteredFormat": {
-                    "backgroundColor": {"red": 0.267, "green": 0.447, "blue": 0.769},
+                    "backgroundColor": {"red": 0.949, "green": 0.580, "blue": 0.118},
                     "textFormat": {
                         "bold": True,
                         "foregroundColor": {"red": 1, "green": 1, "blue": 1},
