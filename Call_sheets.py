@@ -440,8 +440,6 @@ def read_deliveries(sheet, spreadsheet_id, stand_name):
     Duplicate (date, item) entries are logged as warnings.
     """
     tab = f"Deliveries-{stand_name}"
-    print(f"Stand name: '{stand_name}'")
-    print(f"Tab name: '{tab}'")
 
     # --- Resolve column positions from header row ---
     header_rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A1:D1")
@@ -459,7 +457,6 @@ def read_deliveries(sheet, spreadsheet_id, stand_name):
 
     # --- Read data rows ---
     range_str = f"'{tab}'!A2:D200"
-    print(f"Range: '{range_str}'")
     raw_rows = get_values(sheet, spreadsheet_id, range_str)
 
     # --- Duplicate detection ---
@@ -884,7 +881,6 @@ def tubs_used_from_scoops(flavor_totals):
         flavor: round(scoops / SCOOPS_PER_TUB, 2)
         for flavor, scoops in flavor_totals.items()
     }
-    print("Tubs used:", tubs_used)
     return tubs_used
 
 
