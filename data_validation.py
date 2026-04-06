@@ -161,23 +161,62 @@ class DataValidator:
         self._logger = _make_logger("concession.DataValidator")
 
     def flag_negative_expected(
-        self, expected_totals: Dict[str, float]
+    self, expected_totals: Dict[str, float]
     ) -> List[str]:
         """Return a list of items whose expected inventory is negative.
-
+        
+        SPECIAL HANDLING: Ice cream scoop variants (e.g., "Vanilla Double Scoop")
+        are consolidated into their base flavor (e.g., "Vanilla") before checking,
+        because the sheet treats all scoop variants as ONE inventory line item.
+        
         Args:
             expected_totals: Mapping of item name -> expected quantity.
-
+        
         Returns:
             List of item names with negative expected values (empty if none).
         """
+        from Call_sheets import TOFTS_ICE_CREAM, normalize_flavor
+        
         flagged = []
-        for item, value in expected_totals.items():
+        
+        # Step 1: Consolidate ice cream flavor variants
+        consolidated = dict(expected_totals)
+        items_to_remove = []
+        
+        for item in list(expected_totals.keys()):
+            # Check if this item is in TOFTS_ICE_CREAM (any variant)
+            is_tofts_variant = False
+            normalized_item = normalize_flavor(item)
+            
+            for base_flavor in TOFTS_ICE_CREAM:
+                normalized_base = normalize_flavor(base_flavor)
+                
+                # If normalized names match, this is a variant of that base
+                if normalized_item == normalized_base:
+                    is_tofts_variant = True
+                    
+                    # If it's not the exact base flavor, it's a variant
+                    if item != base_flavor:
+                        # Consolidate: add variant value to base flavor
+                        if base_flavor not in consolidated:
+                            consolidated[base_flavor] = 0
+                        consolidated[base_flavor] += expected_totals[item]
+                        items_to_remove.append(item)
+                    break
+    
+    # Remove variants so we only check base flavors
+        for item in items_to_remove:
+            if item in consolidated:
+             del consolidated[item]
+    
+    # Step 2: Check consolidated totals for negatives
+        for item, value in consolidated.items():
             if isinstance(value, (int, float)) and value < 0:
                 self._logger.warning(
-                    "NEGATIVE EXPECTED INVENTORY: %r = %s", item, value
-                )
-                flagged.append(item)
+                "NEGATIVE EXPECTED INVENTORY: %r = %s", item, value
+            )
+            flagged.append(item)
+    
         return flagged
 
     def detect_duplicate_deliveries(

@@ -1511,11 +1511,14 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
             )
             # Actual = Individuals + Cases/Packs × Qty Per Case.
             # Returns blank until at least one helper column is filled in.
+            # NEW (CORRECT):
             actual_formula = (
                 f'=IF(AND({ind_col}{row_num}="",'
-                f'{cas_col}{row_num}=""),"",IFERROR('
-                f'{ind_col}{row_num}+{cas_col}{row_num}*{qty_col}{row_num},"")'
-                f')'
+                f'{cas_col}{row_num}=""),'
+                f'IF({ex_col}{row_num}="",'
+                f'"",'
+                f'{ex_col}{row_num}),'
+                f'IFERROR({ind_col}{row_num}+{cas_col}{row_num}*{qty_col}{row_num},""))'
             )
             variance_formula = (
                 f'=IF({ac_col}{row_num}="",'
