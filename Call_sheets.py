@@ -7,6 +7,7 @@ from datetime import datetime
 import re
 import unicodedata
 import requests
+from data_validation import AuditLogger, DataValidator, ItemMatcher
 
 
 def get_sheet_id(service, spreadsheet_id, sheet_name):
@@ -422,47 +423,66 @@ def get_values(sheet, spreadsheet_id, range_string):
     return result.get("values", [])
 
 def read_deliveries(sheet, spreadsheet_id, stand_name):
-    """Read the Deliveries - {stand} tab and accumulate deliveries per item.
-    
+    """Read the Deliveries-{stand} tab and accumulate deliveries per item.
 
     Tab format (row 1 = header, rows 2+ = data):
-      A: DATE  (optional, for record-keeping)
+      A: DATE              (optional, for record-keeping)
       B: ITEM
       C: PACKAGES / QUANTITY
-      D: UNITS PER PACKAGE  (optional, defaults to 1)
+      D: UNITS PER PACKAGE (optional, defaults to 1)
+
+    Column positions are resolved from the header row so the function is
+    resilient to column re-ordering or renamed headers.  Positional defaults
+    (B=item, C=packages, D=units_per) are used as fallback when no header row
+    exists.
 
     Quantities are ACCUMULATED so multiple deliveries in one week are summed.
+    Duplicate (date, item) entries are logged as warnings.
     """
-
     tab = f"Deliveries-{stand_name}"
-    range_str = f"'{tab}'!A2:D200"
     print(f"Stand name: '{stand_name}'")
     print(f"Tab name: '{tab}'")
-    print(f"Range: '{range_str}'")
-    rows = get_values(sheet, spreadsheet_id, range_str)
 
-    
-    tab = f"Deliveries-{stand_name}"
+    # --- Resolve column positions from header row ---
+    header_rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A1:D1")
+    headers = [h.strip().lower() for h in (header_rows[0] if header_rows else [])]
+
+    def _col_idx(candidates, default):
+        for i, h in enumerate(headers):
+            if h in candidates:
+                return i
+        return default
+
+    item_idx  = _col_idx({"item", "item name"}, 1)
+    qty_idx   = _col_idx({"packages", "quantity", "qty", "packages / quantity", "packages/quantity"}, 2)
+    units_idx = _col_idx({"units per package", "units per", "units/pkg", "units/package"}, 3)
+
+    # --- Read data rows ---
     range_str = f"'{tab}'!A2:D200"
-    rows = get_values(sheet, spreadsheet_id, range_str)
+    print(f"Range: '{range_str}'")
+    raw_rows = get_values(sheet, spreadsheet_id, range_str)
+
+    # --- Duplicate detection ---
+    _validator = DataValidator()
+    _validator.detect_duplicate_deliveries(raw_rows, item_col=item_idx, date_col=0)
 
     deliveries = {}
 
-    for row in rows:
-        if len(row) < 3:
-            continue  # need at least Date, Item, Quantity
+    for row in raw_rows:
+        if len(row) <= item_idx:
+            continue  # row too short to contain the item column
 
-        item = row[1].strip() if len(row) > 1 else ""
+        item = row[item_idx].strip() if row[item_idx] else ""
         if not item:
             continue
 
         try:
-            packages = int(row[2].strip()) if row[2].strip() else 0
+            packages = int(row[qty_idx].strip()) if len(row) > qty_idx and row[qty_idx].strip() else 0
         except (ValueError, IndexError):
             packages = 0
 
         try:
-            units_per = int(row[3].strip()) if len(row) > 3 and row[3].strip() else 1
+            units_per = int(row[units_idx].strip()) if len(row) > units_idx and row[units_idx].strip() else 1
         except (ValueError, IndexError):
             units_per = 1
 
@@ -473,30 +493,49 @@ def read_deliveries(sheet, spreadsheet_id, stand_name):
     return deliveries
 
 def read_spoilage(sheet, spreadsheet_id, stand_name):
-    """Read the Spoilage - {stand} tab and return accumulated spoilage per item.
+    """Read the Spoilage-{stand} tab and return accumulated spoilage per item.
 
     Tab format (row 1 = header, rows 2+ = data):
-      A: DATE  (optional, for record-keeping)
+      A: DATE         (optional, for record-keeping)
       B: ITEM
       C: UNITS SPOILED
+
+    Column positions are resolved from the header row so the function is
+    resilient to column re-ordering or renamed headers.  Positional defaults
+    (B=item, C=units_spoiled) are used as fallback when no header row exists.
 
     Quantities are ACCUMULATED across all rows for the week.
     """
     tab = f"Spoilage-{stand_name}"
-    range_str = f"{tab}!A2:C200"
-    rows = get_values(sheet, spreadsheet_id, range_str)
+
+    # --- Resolve column positions from header row ---
+    header_rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A1:C1")
+    headers = [h.strip().lower() for h in (header_rows[0] if header_rows else [])]
+
+    def _col_idx(candidates, default):
+        for i, h in enumerate(headers):
+            if h in candidates:
+                return i
+        return default
+
+    item_idx   = _col_idx({"item", "item name"}, 1)
+    units_idx  = _col_idx({"units spoiled", "units", "quantity", "qty", "spoilage"}, 2)
+
+    # --- Read data rows ---
+    range_str = f"'{tab}'!A2:C200"
+    raw_rows = get_values(sheet, spreadsheet_id, range_str)
     spoilage = {}
 
-    for row in rows:
-        if len(row) < 3:
-            continue  # need at least Date, Item, Quantity
+    for row in raw_rows:
+        if len(row) <= item_idx:
+            continue  # row too short to contain the item column
 
-        item = row[1].strip() if len(row) > 1 else ""
+        item = row[item_idx].strip() if row[item_idx] else ""
         if not item:
             continue
 
         try:
-            units_spoiled = int(row[2].strip()) if row[2].strip() else 0
+            units_spoiled = int(row[units_idx].strip()) if len(row) > units_idx and row[units_idx].strip() else 0
         except (ValueError, IndexError):
             units_spoiled = 0
 
@@ -1290,6 +1329,15 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
                 }
 
     # ============================
+    # AUDIT / VALIDATION SETUP
+    # Build the ItemMatcher and helpers now that rows has all canonical items.
+    # ============================
+    week_label = datetime.today().strftime("Week of %m-%d-%Y")
+    audit_logger = AuditLogger(stand_name)
+    validator    = DataValidator()
+    item_matcher = ItemMatcher(list(rows.keys()))
+
+    # ============================
     # ICE CREAM SCOOP + TUBS LOGIC
     # ============================
     flavor_totals = group_scoops_by_flavor(rows)
@@ -1312,37 +1360,61 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
 
     # ============================
     # READ LAST WEEK'S ACTUALS → THIS WEEK'S STARTING INVENTORY
+    # Uses ItemMatcher so ALL categories carry forward correctly even if item
+    # names have slight variations between runs.
     # ============================
     last_week_actuals = read_last_week_actuals_from_stand_sheet(
         sheet, spreadsheet_id, stand_name
     )
+    unmatched_starting = []
     for item in rows:
-        rows[item]["starting"] = last_week_actuals.get(item, 0)
+        if item in last_week_actuals:
+            rows[item]["starting"] = last_week_actuals[item]
+        else:
+            matched = item_matcher.find_match(item)
+            if matched and matched in last_week_actuals:
+                rows[item]["starting"] = last_week_actuals[matched]
+            else:
+                rows[item]["starting"] = 0
+                # Only report as unmatched when a previous week exists
+                if last_week_actuals:
+                    unmatched_starting.append(item)
+    audit_logger.log_starting_inventory(last_week_actuals, unmatched_starting)
 
     # ============================
     # SPOILAGE INTEGRATION
+    # Backup is logged BEFORE clearing so data is never silently lost on crash.
+    # Fuzzy matching prevents silent data loss when staff misspells item names.
     # ============================
     spoilage_totals = read_spoilage(sheet, spreadsheet_id, stand_name)
+    audit_logger.log_spoilage_backup(spoilage_totals)  # crash-safe backup
+
+    # Reset all spoilage to 0, then apply matched entries
     for item in rows:
-        rows[item]["spoilage"] = spoilage_totals.get(item, 0)
+        rows[item]["spoilage"] = 0
+    unmatched_spoilage = []
+    for spoilage_item, qty in spoilage_totals.items():
+        matched = item_matcher.find_match(spoilage_item)
+        if matched and matched in rows:
+            rows[matched]["spoilage"] = rows[matched].get("spoilage", 0) + qty
+        else:
+            unmatched_spoilage.append(spoilage_item)
+    audit_logger.log_spoilage_read(spoilage_totals, unmatched_spoilage)
     clear_spoilage_sheet(sheet, spreadsheet_id, stand_name)
 
     # ============================
     # DELIVERIES INTEGRATION (accumulated)
+    # Fuzzy matching prevents silent data loss when staff misspells item names.
     # ============================
     delivery_totals = read_deliveries(sheet, spreadsheet_id, stand_name)
+    unmatched_deliveries = []
     for delivery_item, qty in delivery_totals.items():
-        found = False
-        for tofts_flavor in TOFTS_ICE_CREAM:
-            if tofts_flavor == delivery_item:
-                rows[tofts_flavor]["deliveries"] = qty
-                found = True
-                break
-        if not found:
-            for item_name in list(rows.keys()):
-                if item_name == delivery_item:
-                    rows[item_name]["deliveries"] = qty
-                    break
+        matched = item_matcher.find_match(delivery_item)
+        if matched and matched in rows:
+            rows[matched]["deliveries"] = qty
+        else:
+            unmatched_deliveries.append(delivery_item)
+    audit_logger.log_deliveries_read(delivery_totals, unmatched_deliveries)
 
     # ============================
     # EXPECTED INVENTORY CALCULATION
@@ -1357,14 +1429,21 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
         rows[item]["expected"] = expected_totals.get(item, 0)
 
     # ============================
+    # DATA INTEGRITY VALIDATION
+    # Flag items with negative expected inventory before writing to the sheet.
+    # ============================
+    negative_items = validator.flag_negative_expected(expected_totals)
+    audit_logger.log_inventory_write(week_label, negative_items)
+
+    # ============================
     # BUILD ITEM → ROW-NUMBER LOOKUP (reads column A of the stand sheet)
     # ============================
     item_row_map = read_item_row_map(sheet, spreadsheet_id, stand_name)
 
     # ============================
     # WRITE WEEK LABEL (row 1) AND COLUMN SUB-HEADERS (row 2)
+    # week_label was already computed at the top of the data pipeline above.
     # ============================
-    week_label = datetime.today().strftime("Week of %m-%d-%Y")
     week_start_letter = col_letter(next_week_start)
     week_end_letter   = col_letter(next_week_start + COLS_PER_WEEK - 1)
 
