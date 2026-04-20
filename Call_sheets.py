@@ -481,10 +481,11 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
       D: PACKAGES / QUANTITY
       E: UNITS PER PACKAGE (optional, defaults to 1)
 
-    The TYPE column enables employees to enter ice cream deliveries in tubs
-    (the physical unit they receive) rather than scoops.  When TYPE is "Tubs"
-    the computed total_units is automatically multiplied by SCOOPS_PER_TUB (60).
-    For any other TYPE value — or when the column is absent — the packages
+    The TYPE column enables employees to enter Toft's ice cream deliveries in
+    tubs (the physical unit they receive) rather than scoops.  When TYPE is
+    "Tubs" AND the item is in TOFTS_ICE_CREAM, the computed total_units is
+    automatically multiplied by SCOOPS_PER_TUB (60).  For any other TYPE
+    value, non-Toft's items, or when the column is absent, the packages
     quantity is used as-is (backward-compatible).
 
     Column positions are resolved from the header row so the function is
@@ -573,9 +574,16 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
                 delivery_type = "units"
 
         total_units = packages * units_per
+
+        # ONLY convert tubs→scoops for Toft's ice cream items
         if delivery_type == "tubs":
-            total_units = total_units * SCOOPS_PER_TUB
-            print(f"  [Deliveries] '{item}': {packages} tub(s) × {units_per} × {SCOOPS_PER_TUB} = {total_units} scoops")
+            is_tofts_ice_cream = any(
+                item.lower() == tofts_item.lower()
+                for tofts_item in TOFTS_ICE_CREAM
+            )
+            if is_tofts_ice_cream:
+                total_units = total_units * SCOOPS_PER_TUB
+                print(f"  [Deliveries] '{item}': {packages} tub(s) × {SCOOPS_PER_TUB} = {total_units} scoops")
 
         # ACCUMULATE so mid-week deliveries are summed, not overwritten
         deliveries[item] = deliveries.get(item, 0) + total_units
