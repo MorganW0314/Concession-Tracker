@@ -481,12 +481,15 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
       D: PACKAGES / QUANTITY
       E: UNITS PER PACKAGE (optional, defaults to 1)
 
-    The TYPE column enables employees to enter Toft's ice cream deliveries in
-    tubs (the physical unit they receive) rather than scoops.  When TYPE is
-    "Tubs" AND the item is in TOFTS_ICE_CREAM, the computed total_units is
-    automatically multiplied by SCOOPS_PER_TUB (60).  For any other TYPE
-    value, non-Toft's items, or when the column is absent, the packages
-    quantity is used as-is (backward-compatible).
+    Returns a dict: {item: {"display": qty, "scoops": qty}}
+
+    For Toft's ice cream items with TYPE="Tubs":
+      - display = packages  (what the employee entered; shown on the sheet)
+      - scoops  = packages × SCOOPS_PER_TUB  (used in Expected calculation)
+
+    For all other items (TYPE="Units" or no TYPE column):
+      - display = packages × units_per
+      - scoops  = packages × units_per  (same value — no conversion needed)
 
     Column positions are resolved from the header row so the function is
     resilient to column re-ordering or renamed headers.  When no header row
@@ -573,20 +576,34 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
             except (ValueError, IndexError):
                 delivery_type = "units"
 
-        total_units = packages * units_per
+        # Determine display and scoops values separately.
+        # For Toft's ice cream delivered in tubs:
+        #   display = packages (the tub count employees see on the sheet)
+        #   scoops  = packages × SCOOPS_PER_TUB (used in Expected formula math)
+        # For everything else:
+        #   display = scoops = packages × units_per (no conversion needed)
+        is_tofts_ice_cream = any(
+            item.lower() == tofts_item.lower()
+            for tofts_item in TOFTS_ICE_CREAM
+        )
 
-        # ONLY convert tubs→scoops for Toft's ice cream items
-        if delivery_type == "tubs":
-            is_tofts_ice_cream = any(
-                item.lower() == tofts_item.lower()
-                for tofts_item in TOFTS_ICE_CREAM
+        if delivery_type == "tubs" and is_tofts_ice_cream:
+            display_qty = packages
+            scoops_qty  = packages * SCOOPS_PER_TUB
+            print(
+                f"  [Deliveries] '{item}': {packages} tub(s) displayed; "
+                f"{scoops_qty} scoops used in Expected formula"
             )
-            if is_tofts_ice_cream:
-                total_units = total_units * SCOOPS_PER_TUB
-                print(f"  [Deliveries] '{item}': {packages} tub(s) × {SCOOPS_PER_TUB} = {total_units} scoops")
+        else:
+            display_qty = packages * units_per
+            scoops_qty  = packages * units_per
 
         # ACCUMULATE so mid-week deliveries are summed, not overwritten
-        deliveries[item] = deliveries.get(item, 0) + total_units
+        existing = deliveries.get(item, {"display": 0, "scoops": 0})
+        deliveries[item] = {
+            "display": existing["display"] + display_qty,
+            "scoops":  existing["scoops"]  + scoops_qty,
+        }
 
     return deliveries
 
@@ -1511,10 +1528,11 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
         week_end_date=week_end_date,
     )
     unmatched_deliveries = []
-    for delivery_item, qty in delivery_totals.items():
+    for delivery_item, delivery_data in delivery_totals.items():
         matched = item_matcher.find_match(delivery_item)
         if matched and matched in rows:
-            rows[matched]["deliveries"] = qty
+            rows[matched]["deliveries_display"] = delivery_data["display"]
+            rows[matched]["deliveries_scoops"]  = delivery_data["scoops"]
         else:
             unmatched_deliveries.append(delivery_item)
     audit_logger.log_deliveries_read(delivery_totals, unmatched_deliveries)
@@ -1524,7 +1542,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     # ============================
     expected_totals = calculate_expected_inventory(
         {item: rows[item].get("starting", 0) for item in rows},
-        {item: rows[item].get("deliveries", 0) for item in rows},
+        {item: rows[item].get("deliveries_scoops", 0) for item in rows},
         {item: rows[item].get("sales", 0) for item in rows},
         {item: rows[item].get("spoilage", 0) for item in rows},
     )
@@ -1608,10 +1626,19 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
             item_data = rows.get(item, {})
 
             # Spreadsheet formulas (use USER_ENTERED so Sheets evaluates them).
-            expected_formula = (
-                f"={s_col}{row_num}+{d_col}{row_num}"
-                f"-{sa_col}{row_num}-{sp_col}{row_num}"
-            )
+            # For Toft's ice cream the Deliveries column stores tubs (the display
+            # value), so we must multiply by SCOOPS_PER_TUB in the formula and
+            # subtract Scoops Used (from POS) rather than the raw Sales count.
+            if is_tofts:
+                expected_formula = (
+                    f"={s_col}{row_num}+{d_col}{row_num}*{SCOOPS_PER_TUB}"
+                    f"-{sc_col}{row_num}-{sp_col}{row_num}"
+                )
+            else:
+                expected_formula = (
+                    f"={s_col}{row_num}+{d_col}{row_num}"
+                    f"-{sa_col}{row_num}-{sp_col}{row_num}"
+                )
             # Actual = Individuals + Cases/Packs × Qty Per Case.
             # Returns blank until at least one helper column is filled in.
             # NEW (CORRECT):
@@ -1629,10 +1656,10 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
             )
 
             row_values = [
-                item_data.get("starting", 0),       # Starting
-                item_data.get("deliveries", 0),      # Deliveries
-                item_data.get("sales", 0),           # Sales
-                item_data.get("spoilage", 0),        # Spoilage
+                item_data.get("starting", 0),            # Starting
+                item_data.get("deliveries_display", 0),  # Deliveries (tubs for ice cream, units otherwise)
+                item_data.get("sales", 0),               # Sales
+                item_data.get("spoilage", 0),            # Spoilage
                 expected_formula,                    # Expected (formula)
                 "",                                  # Individuals   (employee fills in)
                 "",                                  # Cases/Packs   (employee fills in)
