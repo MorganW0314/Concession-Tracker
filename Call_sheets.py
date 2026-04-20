@@ -27,6 +27,10 @@ def get_sheet_id(service, spreadsheet_id, sheet_name):
 #         Scoops Used | Tubs Used
 COLS_PER_WEEK = 12
 
+# Number of scoops in one ice cream tub.  Used to convert "Tubs" deliveries
+# to scoops when the Deliveries tab includes a TYPE column.
+SCOOPS_PER_TUB = 60
+
 # Sub-header labels written in row 2 for every week block.
 WEEK_COL_HEADERS = [
     "Starting", "Deliveries", "Sales", "Spoilage",
@@ -473,13 +477,20 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
     Tab format (row 1 = header, rows 2+ = data):
       A: DATE              (optional, for record-keeping)
       B: ITEM
-      C: PACKAGES / QUANTITY
-      D: UNITS PER PACKAGE (optional, defaults to 1)
+      C: TYPE              (optional; "Tubs" or "Units", defaults to "Units")
+      D: PACKAGES / QUANTITY
+      E: UNITS PER PACKAGE (optional, defaults to 1)
+
+    The TYPE column enables employees to enter ice cream deliveries in tubs
+    (the physical unit they receive) rather than scoops.  When TYPE is "Tubs"
+    the computed total_units is automatically multiplied by SCOOPS_PER_TUB (60).
+    For any other TYPE value — or when the column is absent — the packages
+    quantity is used as-is (backward-compatible).
 
     Column positions are resolved from the header row so the function is
-    resilient to column re-ordering or renamed headers.  Positional defaults
-    (B=item, C=packages, D=units_per) are used as fallback when no header row
-    exists.
+    resilient to column re-ordering or renamed headers.  When no header row
+    exists, positional defaults assume the old three-column layout (A=date,
+    B=item, C=packages, D=units_per) without a TYPE column.
 
     When week_start_date and week_end_date are provided (as datetime.date
     objects), only rows whose Column-A date falls within that inclusive range
@@ -493,7 +504,7 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
     tab = f"Deliveries-{stand_name}"
 
     # --- Resolve column positions from header row ---
-    header_rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A1:D1")
+    header_rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A1:E1")
     headers = [h.strip().lower() for h in (header_rows[0] if header_rows else [])]
 
     def _col_idx(candidates, default):
@@ -503,11 +514,12 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         return default
 
     item_idx  = _col_idx({"item", "item name"}, 1)
+    type_idx  = _col_idx({"type", "unit type", "delivery type"}, None)
     qty_idx   = _col_idx({"packages", "quantity", "qty", "packages / quantity", "packages/quantity"}, 2)
     units_idx = _col_idx({"units per package", "units per", "units/pkg", "units/package"}, 3)
 
     # --- Read data rows ---
-    range_str = f"'{tab}'!A2:D200"
+    range_str = f"'{tab}'!A2:E200"
     raw_rows = get_values(sheet, spreadsheet_id, range_str)
 
     # --- Duplicate detection ---
@@ -551,7 +563,20 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         except (ValueError, IndexError):
             units_per = 1
 
+        # --- Type column: convert tubs → scoops when delivery type is "tubs" ---
+        delivery_type = "units"
+        if type_idx is not None:
+            try:
+                raw_type = row[type_idx].strip().lower() if len(row) > type_idx and row[type_idx] else ""
+                delivery_type = raw_type if raw_type else "units"
+            except (ValueError, IndexError):
+                delivery_type = "units"
+
         total_units = packages * units_per
+        if delivery_type == "tubs":
+            total_units = total_units * SCOOPS_PER_TUB
+            print(f"  [Deliveries] '{item}': {packages} tub(s) × {units_per} × {SCOOPS_PER_TUB} = {total_units} scoops")
+
         # ACCUMULATE so mid-week deliveries are summed, not overwritten
         deliveries[item] = deliveries.get(item, 0) + total_units
 
