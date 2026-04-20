@@ -3,7 +3,7 @@ from unittest import result
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import unicodedata
 import requests
@@ -422,7 +422,52 @@ def get_values(sheet, spreadsheet_id, range_string):
 
     return result.get("values", [])
 
-def read_deliveries(sheet, spreadsheet_id, stand_name):
+def extract_week_dates_from_label(week_label):
+    """Parse a 'Week of MM-DD-YYYY' label into a (start_date, end_date) tuple.
+
+    The date in the label is treated as the last day (end) of the week.
+    The start date is computed as end_date minus 6 days so that exactly 7
+    days are covered (start inclusive, end inclusive).
+
+    Returns (start_date, end_date) as datetime.date objects, or (None, None)
+    if the label cannot be parsed.
+    """
+    match = re.search(r"Week of\s+(\d{1,2})-(\d{1,2})-(\d{4})", week_label, re.IGNORECASE)
+    if not match:
+        return None, None
+    try:
+        end_date = datetime(int(match.group(3)), int(match.group(1)), int(match.group(2))).date()
+        start_date = end_date - timedelta(days=6)
+        return start_date, end_date
+    except (ValueError, OverflowError):
+        return None, None
+
+
+def _parse_delivery_date(date_str):
+    """Parse a delivery date string into a datetime.date, supporting multiple formats.
+
+    Supports M-D-YYYY, MM-DD-YYYY, M/D/YYYY, MM/DD/YYYY, and YYYY-MM-DD.
+    Returns a datetime.date on success, or None if the string cannot be parsed.
+    """
+    for fmt in ("%m-%d-%Y", "%m/%d/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(date_str.strip(), fmt).date()
+        except ValueError:
+            pass
+    # Fallback: try splitting on common separators and constructing the date
+    # (handles single-digit months/days: "4-1-2025", "4/1/2025", etc.)
+    for sep in ("-", "/"):
+        parts = date_str.strip().split(sep)
+        if len(parts) == 3:
+            try:
+                month, day, year = int(parts[0]), int(parts[1]), int(parts[2])
+                return datetime(year, month, day).date()
+            except (ValueError, OverflowError):
+                pass
+    return None
+
+
+def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, week_end_date=None):
     """Read the Deliveries-{stand} tab and accumulate deliveries per item.
 
     Tab format (row 1 = header, rows 2+ = data):
@@ -435,6 +480,12 @@ def read_deliveries(sheet, spreadsheet_id, stand_name):
     resilient to column re-ordering or renamed headers.  Positional defaults
     (B=item, C=packages, D=units_per) are used as fallback when no header row
     exists.
+
+    When week_start_date and week_end_date are provided (as datetime.date
+    objects), only rows whose Column-A date falls within that inclusive range
+    are counted.  Rows with an unparseable date are skipped with a warning.
+    If neither date is supplied the function reads all rows (backward-
+    compatible behaviour).
 
     Quantities are ACCUMULATED so multiple deliveries in one week are summed.
     Duplicate (date, item) entries are logged as warnings.
@@ -463,11 +514,28 @@ def read_deliveries(sheet, spreadsheet_id, stand_name):
     _validator = DataValidator()
     _validator.detect_duplicate_deliveries(raw_rows, item_col=item_idx, date_col=0)
 
+    filter_by_date = week_start_date is not None and week_end_date is not None
+    if filter_by_date:
+        print(f"  [Deliveries] Filtering to {week_start_date} – {week_end_date}")
+
     deliveries = {}
 
     for row in raw_rows:
         if len(row) <= item_idx:
             continue  # row too short to contain the item column
+
+        # --- Date filtering ---
+        if filter_by_date:
+            date_str = row[0].strip() if row and row[0] else ""
+            if not date_str:
+                # No date in column A — skip when filtering is active
+                continue
+            delivery_date = _parse_delivery_date(date_str)
+            if delivery_date is None:
+                print(f"  [Deliveries] WARNING: unparseable date '{date_str}' — row skipped")
+                continue
+            if not (week_start_date <= delivery_date <= week_end_date):
+                continue  # outside the current week's range
 
         item = row[item_idx].strip() if row[item_idx] else ""
         if not item:
@@ -1400,10 +1468,15 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     clear_spoilage_sheet(sheet, spreadsheet_id, stand_name)
 
     # ============================
-    # DELIVERIES INTEGRATION (accumulated)
+    # DELIVERIES INTEGRATION (date-filtered, accumulated)
     # Fuzzy matching prevents silent data loss when staff misspells item names.
     # ============================
-    delivery_totals = read_deliveries(sheet, spreadsheet_id, stand_name)
+    week_start_date, week_end_date = extract_week_dates_from_label(week_label)
+    delivery_totals = read_deliveries(
+        sheet, spreadsheet_id, stand_name,
+        week_start_date=week_start_date,
+        week_end_date=week_end_date,
+    )
     unmatched_deliveries = []
     for delivery_item, qty in delivery_totals.items():
         matched = item_matcher.find_match(delivery_item)
