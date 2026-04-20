@@ -1100,18 +1100,24 @@ def ensure_tab_exists(service, SPREADSHEET_ID, range_string, values, tab_name):
 
     return response["replies"][0]["addSheet"]["properties"]["sheetId"]
 
-# Original base flavors — one entry per physical tub.
-# This set is also used to determine which TOFTS_ICE_CREAM rows should receive
-# the accumulated scoops_used / tubs_used values (variants are excluded so that
-# only the canonical base-flavor row drives the expected-inventory formula).
-_TOFTS_BASE_FLAVORS = {
+# The 12 canonical Toft's base flavors — one entry per physical tub.
+# This list is used for:
+#   1. Sheet display — DEFAULT_CATEGORY_ORDER uses this list so the sheet shows
+#      ONLY these 12 rows, not individual scoop-variant rows.
+#   2. Scoop accumulation — write_full_week assigns scoops_used / tubs_used
+#      only to rows whose normalize_flavor() matches a flavor in this list.
+#   3. Negative-inventory consolidation — flag_negative_expected folds variant
+#      expected values into their base-flavor entry before checking for negatives.
+#
+# "Cotton Candy Ice Cream" (not "Cotton Candy") is intentional: the CANDY
+# category has a separate "Cotton Candy" item and sharing the key would cause
+# row-map collisions in the sheet.
+_TOFTS_BASE_FLAVORS = [
     "Vanilla",
     "Mint Chip",
     "Chocolate",
     "Cookie Dough",
     "Cookies & Cream",
-    # Named "Cotton Candy Ice Cream" to distinguish from the Cotton Candy
-    # candy product sold separately (which remains "Cotton Candy" in CANDY).
     "Cotton Candy Ice Cream",
     "Cookie Monster",
     "Peanut Butter Cup",
@@ -1119,7 +1125,7 @@ _TOFTS_BASE_FLAVORS = {
     "Super Duper Scoop",
     "Rainbow Sherbert",
     "Brownie Bandit",
-}
+]
 
 # Some CSV item names don't normalize (via normalize_flavor) to the same
 # string as their base flavor.  For example:
@@ -1137,8 +1143,9 @@ SCOOP_VARIANT_TO_BASE = {
 }
 
 # Full list: base flavors + all scoop variants found in the CSV.
-# Keeping variants here ensures they appear in the "ICE CREAM (Toft's Scoops)"
-# section of the inventory sheet and receive the correct Toft's expected formula.
+# Used ONLY for CSV-item recognition (group_scoops_by_flavor, read_deliveries,
+# is_tofts checks).  The sheet display uses _TOFTS_BASE_FLAVORS (the 12 bases)
+# so that scoop-variant rows do NOT appear as separate lines on the sheet.
 TOFTS_ICE_CREAM = [
     # --- Base flavors ---
     "Vanilla",
@@ -1334,7 +1341,10 @@ INGREDIENT_MAP = {
 # Default category order (used when no stand-specific Master Items tab exists)
 # ---------------------------------------------------------------------------
 DEFAULT_CATEGORY_ORDER = [
-    ("ICE CREAM (Toft's Scoops)", TOFTS_ICE_CREAM),
+    # Only the 12 base flavors appear on the sheet; scoop variants (Single/Double)
+    # are recognised via TOFTS_ICE_CREAM for CSV matching but are NOT given their
+    # own rows — their scoops are consolidated into the base-flavor rows.
+    ("ICE CREAM (Toft's Scoops)", _TOFTS_BASE_FLAVORS),
     ("NOVELTY ICE CREAM", NOVELTY_ICE_CREAM),
     ("CANDY", CANDY),
     ("DRINKS", DRINKS),
