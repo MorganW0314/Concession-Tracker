@@ -3,6 +3,8 @@
 This module provides:
 - ItemMatcher: robust fuzzy matching of item names against a canonical list,
   preventing "Cookies N Cream" / "Cookies & Cream" collisions.
+- CategoryAwareItemMatcher: extends ItemMatcher to prevent cross-category
+  collisions (e.g., "Cotton Candy" vs "Cotton Candy Ice Cream").
 - DataValidator: checks data integrity (negatives, duplicates, variance alerts).
 - AuditLogger: timestamped audit trail for all major data pipeline operations.
 """
@@ -141,6 +143,207 @@ class ItemMatcher:
         )
         self._cache[item_name] = None
         return None
+
+
+# ---------------------------------------------------------------------------
+# CategoryAwareItemMatcher
+# ---------------------------------------------------------------------------
+
+class CategoryAwareItemMatcher(ItemMatcher):
+    """Category-aware fuzzy matcher that prevents cross-category collisions.
+
+    Extends :class:`ItemMatcher` with a *category map* so that items which
+    share a prefix (e.g. "Cotton Candy", "Cotton Candy Ice Cream", and
+    "Cotton Candy Syrup (decimal estimate)") are matched within their expected
+    category context rather than greedily matched to the highest-scoring
+    canonical item regardless of category.
+
+    When an expected category is supplied via :meth:`find_match_in_category`,
+    the method:
+
+    1. Runs the normal three-level resolution (exact → case-insensitive → fuzzy)
+       *restricted to items in that category*.
+    2. Falls back to the full-list resolution only when no in-category candidate
+       meets the threshold.
+    3. Logs every category resolution decision for the audit trail.
+
+    When no category is known (e.g. free-form Deliveries or Spoilage tabs),
+    :meth:`find_match` behaves exactly as the base :class:`ItemMatcher`.
+
+    Example::
+
+        category_map = CategoryAwareItemMatcher.build_category_map([
+            ("TOFTS_ICE_CREAM", ["Cotton Candy Ice Cream", "Vanilla"]),
+            ("CANDY", ["Cotton Candy", "Starburst"]),
+        ])
+        matcher = CategoryAwareItemMatcher(
+            list(category_map.keys()), category_map
+        )
+
+        # Restricts to CANDY – returns "Cotton Candy", not "Cotton Candy Ice Cream"
+        matcher.find_match_in_category("cotton candy", "CANDY")
+
+        # No category constraint – uses regular fuzzy match
+        matcher.find_match("cotton candy")
+    """
+
+    def __init__(
+        self,
+        canonical_items: List[str],
+        category_map: Dict[str, str],
+        threshold: float = 0.85,
+    ):
+        """
+        Args:
+            canonical_items: Authoritative list of item names (all categories).
+            category_map:    Mapping of *canonical item name* → *category label*.
+                             Build this with :meth:`build_category_map`.
+            threshold:       Minimum SequenceMatcher ratio required to accept a
+                             fuzzy match.  Default 0.85 matches the base class.
+        """
+        super().__init__(canonical_items, threshold)
+        self.category_map: Dict[str, str] = dict(category_map)
+        self._logger = _make_logger("concession.CategoryAwareItemMatcher")
+        # Separate cache keyed by (item_name, category) tuples; does not
+        # interfere with the parent class's str-keyed _cache.
+        self._category_cache: Dict[Tuple[str, str], Optional[str]] = {}
+
+    # ------------------------------------------------------------------
+    # Class-level helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def build_category_map(
+        category_lists: List[Tuple[str, List[str]]]
+    ) -> Dict[str, str]:
+        """Build a *item → category* mapping from a list of (label, items) pairs.
+
+        Args:
+            category_lists: Sequence of ``(category_label, item_names)`` pairs,
+                            typically sourced from ``DEFAULT_CATEGORY_ORDER``.
+
+        Returns:
+            Dict mapping every item name to its category label.  If an item
+            appears in more than one category the *last* occurrence wins (this
+            mirrors sheet ordering precedence).
+
+        Example::
+
+            from Call_sheets import DEFAULT_CATEGORY_ORDER
+            cmap = CategoryAwareItemMatcher.build_category_map(DEFAULT_CATEGORY_ORDER)
+        """
+        mapping: Dict[str, str] = {}
+        for category_label, items in category_lists:
+            for item in items:
+                mapping[item] = category_label
+        return mapping
+
+    # ------------------------------------------------------------------
+    # Category-restricted matching
+    # ------------------------------------------------------------------
+
+    def find_match_in_category(
+        self, item_name: str, expected_category: str
+    ) -> Optional[str]:
+        """Return the best canonical match for *item_name* within *expected_category*.
+
+        Resolution order:
+        1. Exact-case match within the expected category.
+        2. Case-insensitive exact match within the expected category.
+        3. Fuzzy match above *threshold* within the expected category.
+        4. If no in-category match is found, log a warning and delegate to the
+           base :meth:`find_match` (all categories) so data is never silently
+           lost.
+
+        All category resolution decisions are logged.
+
+        Args:
+            item_name:         Raw item name as entered by staff.
+            expected_category: Category label to restrict matching to
+                               (e.g. ``"CANDY"`` or ``"TOFTS_ICE_CREAM"``).
+
+        Returns:
+            Matched canonical name, or ``None`` when no candidate meets the
+            threshold in *any* category.
+        """
+        cache_key = (item_name, expected_category)
+        if cache_key in self._category_cache:
+            return self._category_cache[cache_key]
+
+        # Items that belong to the expected category
+        category_items = [
+            c for c in self.canonical_items
+            if self.category_map.get(c) == expected_category
+        ]
+
+        if not category_items:
+            self._logger.warning(
+                "Category %r has no canonical items; falling back to full-list match for %r",
+                expected_category,
+                item_name,
+            )
+            result = self.find_match(item_name)
+            self._category_cache[cache_key] = result
+            return result
+
+        norm_input = self._normalize(item_name)
+
+        # 1. Exact-case match within category
+        if item_name in category_items:
+            self._logger.info(
+                "Category match (exact): %r -> %r (category=%r)",
+                item_name, item_name, expected_category,
+            )
+            self._category_cache[cache_key] = item_name
+            return item_name
+
+        # 2. Case-insensitive exact match within category
+        for canonical in category_items:
+            if self._normalize(canonical) == norm_input:
+                self._logger.info(
+                    "Category match (case-insensitive): %r -> %r (category=%r)",
+                    item_name, canonical, expected_category,
+                )
+                self._category_cache[cache_key] = canonical
+                return canonical
+
+        # 3. Fuzzy match within category
+        best_match: Optional[str] = None
+        best_score = 0.0
+        for canonical in category_items:
+            score = SequenceMatcher(
+                None, norm_input, self._normalize(canonical)
+            ).ratio()
+            if score > best_score:
+                best_score = score
+                best_match = canonical
+
+        if best_score >= self.threshold:
+            if best_score < 1.0:
+                self._logger.info(
+                    "Category match (fuzzy): %r -> %r (score=%.2f, category=%r)",
+                    item_name, best_match, best_score, expected_category,
+                )
+            self._category_cache[cache_key] = best_match
+            return best_match
+
+        # 4. No in-category match – fall back to full-list so data is not lost
+        self._logger.warning(
+            "No in-category match for %r in category %r "
+            "(best in-category candidate=%r, score=%.2f); "
+            "falling back to full-list match",
+            item_name, expected_category, best_match, best_score,
+        )
+        result = self.find_match(item_name)
+        if result:
+            result_category = self.category_map.get(result, "<unknown>")
+            self._logger.warning(
+                "Cross-category resolution: %r -> %r "
+                "(expected category=%r, resolved category=%r)",
+                item_name, result, expected_category, result_category,
+            )
+        self._category_cache[cache_key] = result
+        return result
 
 
 # ---------------------------------------------------------------------------

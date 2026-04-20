@@ -7,7 +7,7 @@ from datetime import datetime
 import re
 import unicodedata
 import requests
-from data_validation import AuditLogger, DataValidator, ItemMatcher
+from data_validation import AuditLogger, DataValidator, ItemMatcher, CategoryAwareItemMatcher
 
 
 def get_sheet_id(service, spreadsheet_id, sheet_name):
@@ -1331,7 +1331,8 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     week_label = datetime.today().strftime("Week of %m-%d-%Y")
     audit_logger = AuditLogger(stand_name)
     validator    = DataValidator()
-    item_matcher = ItemMatcher(list(rows.keys()))
+    category_map = CategoryAwareItemMatcher.build_category_map(CATEGORY_ORDER)
+    item_matcher = CategoryAwareItemMatcher(list(rows.keys()), category_map)
 
     # ============================
     # ICE CREAM SCOOP + TUBS LOGIC
