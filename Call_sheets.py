@@ -952,19 +952,24 @@ def group_scoops_by_flavor(rows):
     """
     Given parsed CSV rows, return dict: flavor -> total scoops.
     Uses flavor normalization that strips scoop descriptors only.
+
+    Some CSV item names (e.g. "Cotton Candy Double Scoop") don't normalize to
+    the same string as their base flavor ("Cotton Candy Ice Cream").
+    SCOOP_VARIANT_TO_BASE provides an explicit mapping for those cases so that
+    all scoop variants accumulate into the correct base-flavor bucket.
     """
     flavor_totals = {}
 
     for item_name, data in rows.items():
         name_lower = item_name.lower()
 
-         # Check if this item is in TOFTS_ICE_CREAM (handles base + variants)
-        is_tofts_ice_cream = False
-        for tofts_flavor in TOFTS_ICE_CREAM:
-            if normalize_flavor(item_name) == normalize_flavor(tofts_flavor):
-                is_tofts_ice_cream = True
-                break
-        
+        # Direct case-insensitive membership check against TOFTS_ICE_CREAM,
+        # which now includes all scoop variants explicitly.  Using a direct name
+        # check (rather than normalize-based) avoids false positives such as
+        # "Cotton Candy" (candy item) matching "Cotton Candy Double Scoop" after
+        # both normalize to "cotton candy".
+        is_tofts_ice_cream = any(item_name.lower() == t.lower() for t in TOFTS_ICE_CREAM)
+
         if not is_tofts_ice_cream:
             continue
 
@@ -973,8 +978,12 @@ def group_scoops_by_flavor(rows):
         if not isinstance(quantity, (int, float)):
             continue
 
-        flavor = normalize_flavor(item_name)
-        
+        # Resolve any variant whose CSV name doesn't auto-normalize to its base,
+        # then use the canonical base-flavor name as the accumulation key so that
+        # e.g. "Cotton Candy Double Scoop" rolls up into "cotton candy ice cream".
+        canonical_name = SCOOP_VARIANT_TO_BASE.get(item_name, item_name)
+        flavor = normalize_flavor(canonical_name)
+
         # Count scoops: determine multiplier based on scoop type
         if "triple scoop" in name_lower:
             scoops = quantity * 3
@@ -1091,7 +1100,11 @@ def ensure_tab_exists(service, SPREADSHEET_ID, range_string, values, tab_name):
 
     return response["replies"][0]["addSheet"]["properties"]["sheetId"]
 
-TOFTS_ICE_CREAM = [
+# Original base flavors — one entry per physical tub.
+# This set is also used to determine which TOFTS_ICE_CREAM rows should receive
+# the accumulated scoops_used / tubs_used values (variants are excluded so that
+# only the canonical base-flavor row drives the expected-inventory formula).
+_TOFTS_BASE_FLAVORS = {
     "Vanilla",
     "Mint Chip",
     "Chocolate",
@@ -1105,7 +1118,57 @@ TOFTS_ICE_CREAM = [
     "Strawberry Cheesecake",
     "Super Duper Scoop",
     "Rainbow Sherbert",
-    "Brownie Bandit"
+    "Brownie Bandit",
+}
+
+# Some CSV item names don't normalize (via normalize_flavor) to the same
+# string as their base flavor.  For example:
+#   "Cotton Candy Double Scoop" → strips "double scoop" → "cotton candy"
+#                                  ≠ normalize("Cotton Candy Ice Cream") = "cotton candy ice cream"
+#   "Mint Chip Double"          → no recognized suffix stripped → "mint chip double"
+#                                  ≠ "mint chip"
+#   "Super Duper Scoop Double"  → "super duper scoop double" ≠ "super duper"
+# This dict provides an explicit override so group_scoops_by_flavor can resolve
+# each variant to its canonical base before checking TOFTS_ICE_CREAM.
+SCOOP_VARIANT_TO_BASE = {
+    "Cotton Candy Double Scoop": "Cotton Candy Ice Cream",
+    "Mint Chip Double":          "Mint Chip",
+    "Super Duper Scoop Double":  "Super Duper Scoop",
+}
+
+# Full list: base flavors + all scoop variants found in the CSV.
+# Keeping variants here ensures they appear in the "ICE CREAM (Toft's Scoops)"
+# section of the inventory sheet and receive the correct Toft's expected formula.
+TOFTS_ICE_CREAM = [
+    # --- Base flavors ---
+    "Vanilla",
+    "Mint Chip",
+    "Chocolate",
+    "Cookie Dough",
+    "Cookies & Cream",
+    "Cotton Candy Ice Cream",
+    "Cookie Monster",
+    "Peanut Butter Cup",
+    "Strawberry Cheesecake",
+    "Super Duper Scoop",
+    "Rainbow Sherbert",
+    "Brownie Bandit",
+    # --- Scoop variants (Single / Double) ---
+    "Brownie Bandit Single Scoop",
+    "Brownie Bandit Double Scoop",
+    "Chocolate Single Scoop",
+    "Chocolate Double Scoop",
+    "Cookie Dough Double Scoop",
+    "Cookie Monster Double Scoop",
+    "Cookies & Cream Double Scoop",
+    "Cotton Candy Double Scoop",
+    "Mint Chip Double",
+    "Peanut Butter Cup Double Scoop",
+    "Rainbow Sherbert Double Scoop",
+    "Strawberry Cheesecake Single Scoop",
+    "Strawberry Cheesecake Double Scoop",
+    "Super Duper Scoop Double",
+    "Vanilla Double Scoop",
 ]
 
 
@@ -1460,7 +1523,11 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
 
     for flavor, scoops in flavor_totals.items():
         for tofts_flavor in TOFTS_ICE_CREAM:
-            if normalize_flavor(tofts_flavor) == flavor:
+            # Only assign scoops_used / tubs_used to the canonical BASE flavor
+            # row.  Variant rows (Single Scoop, Double Scoop, etc.) inherit the
+            # Toft's expected formula but intentionally show scoops_used = 0 so
+            # they don't double-count against the base row's expected inventory.
+            if normalize_flavor(tofts_flavor) == flavor and tofts_flavor in _TOFTS_BASE_FLAVORS:
                 rows[tofts_flavor]["scoops_used"] = scoops
                 rows[tofts_flavor]["tubs_used"] = tubs_used_map.get(flavor, 0)
 
