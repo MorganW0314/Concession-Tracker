@@ -378,48 +378,50 @@ class DataValidator:
         Returns:
             List of item names with negative expected values (empty if none).
         """
-        from Call_sheets import TOFTS_ICE_CREAM, normalize_flavor
-        
+        from Call_sheets import TOFTS_ICE_CREAM, normalize_flavor, SCOOP_VARIANT_TO_BASE, _TOFTS_BASE_FLAVORS
+
         flagged = []
-        
-        # Step 1: Consolidate ice cream flavor variants
+
+        # Step 1: Consolidate ice cream flavor variants into their base flavor.
+        # Some CSV variant names don't auto-normalize to their base (e.g.
+        # "Cotton Candy Double Scoop" → "cotton candy" ≠ "cotton candy ice cream").
+        # SCOOP_VARIANT_TO_BASE resolves those before the normalize comparison.
         consolidated = dict(expected_totals)
         items_to_remove = []
-        
+
         for item in list(expected_totals.keys()):
-            # Check if this item is in TOFTS_ICE_CREAM (any variant)
-            is_tofts_variant = False
-            normalized_item = normalize_flavor(item)
-            
-            for base_flavor in TOFTS_ICE_CREAM:
+            # Resolve special variant names to their canonical base
+            canonical_item = SCOOP_VARIANT_TO_BASE.get(item, item)
+            normalized_item = normalize_flavor(canonical_item)
+
+            # Only iterate over base flavors so we always consolidate variants
+            # into the canonical base (not into another variant entry).
+            for base_flavor in _TOFTS_BASE_FLAVORS:
                 normalized_base = normalize_flavor(base_flavor)
-                
-                # If normalized names match, this is a variant of that base
+
                 if normalized_item == normalized_base:
-                    is_tofts_variant = True
-                    
-                    # If it's not the exact base flavor, it's a variant
+                    # If item is not the exact base flavor itself, it's a variant
                     if item != base_flavor:
-                        # Consolidate: add variant value to base flavor
+                        # Consolidate: fold variant value into base flavor
                         if base_flavor not in consolidated:
                             consolidated[base_flavor] = 0
                         consolidated[base_flavor] += expected_totals[item]
                         items_to_remove.append(item)
                     break
-    
-    # Remove variants so we only check base flavors
+
+        # Remove variants so we only check base flavors
         for item in items_to_remove:
             if item in consolidated:
-             del consolidated[item]
-    
-    # Step 2: Check consolidated totals for negatives
+                del consolidated[item]
+
+        # Step 2: Check consolidated totals for negatives
         for item, value in consolidated.items():
             if isinstance(value, (int, float)) and value < 0:
                 self._logger.warning(
-                "NEGATIVE EXPECTED INVENTORY: %r = %s", item, value
-            )
-            flagged.append(item)
-    
+                    "NEGATIVE EXPECTED INVENTORY: %r = %s", item, value
+                )
+                flagged.append(item)
+
         return flagged
 
     def detect_duplicate_deliveries(
