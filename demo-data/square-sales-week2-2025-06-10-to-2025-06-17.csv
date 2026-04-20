@@ -1,0 +1,87 @@
+Item Name,Item Variation,SKU,Category,Items Sold,Gross Sales,Items Refunded,Refunds,Discounts & Comps,Net Sales,Tax,Unit,Units Sold,Units Refunded
+ Vanilla ,Single Scoop,,Ice Cream,50,$150.00,0,$0.00,$0.00,$150.00,$0.00,ea,50,0
+ Vanilla ,Double Scoop,,Ice Cream,38,$190.00,0,$0.00,$0.00,$190.00,$0.00,ea,38,0
+ Vanilla ,Triple Scoop,,Ice Cream,14,$98.00,1,$7.00,$0.00,$91.00,$0.00,ea,14,1
+Chocolate,Single Scoop,,Ice Cream,35,$105.00,0,$0.00,$0.00,$105.00,$0.00,ea,35,0
+Chocolate,Double Scoop,,Ice Cream,32,$160.00,0,$0.00,$0.00,$160.00,$0.00,ea,32,0
+Chocolate,Triple Scoop,,Ice Cream,11,$77.00,0,$0.00,$0.00,$77.00,$0.00,ea,11,0
+Mint Chip,Single Scoop,,Ice Cream,28,$84.00,0,$0.00,$0.00,$84.00,$0.00,ea,28,0
+Mint Chip,Double Scoop,,Ice Cream,25,$125.00,0,$0.00,$0.00,$125.00,$0.00,ea,25,0
+Mint Chip,Triple Scoop,,Ice Cream,9,$63.00,0,$0.00,$0.00,$63.00,$0.00,ea,9,0
+Cookie Dough,Single Scoop,,Ice Cream,30,$90.00,0,$0.00,$0.00,$90.00,$0.00,ea,30,0
+Cookie Dough,Double Scoop,,Ice Cream,32,$160.00,0,$0.00,$0.00,$160.00,$0.00,ea,32,0
+Cookie Dough,Triple Scoop,,Ice Cream,10,$70.00,0,$0.00,$0.00,$70.00,$0.00,ea,10,0
+Cookies N Cream,Single Scoop,,Ice Cream,35,$105.00,0,$0.00,$0.00,$105.00,$0.00,ea,35,0
+Cookies N Cream,Double Scoop,,Ice Cream,24,$120.00,0,$0.00,$0.00,$120.00,$0.00,ea,24,0
+Cookies N Cream,Triple Scoop,,Ice Cream,8,$56.00,0,$0.00,$0.00,$56.00,$0.00,ea,8,0
+cotton candy ice cream,Single Scoop,,Ice Cream,52,$156.00,0,$0.00,$0.00,$156.00,$0.00,ea,52,0
+cotton candy ice cream,Double Scoop,,Ice Cream,41,$205.00,0,$0.00,$0.00,$205.00,$0.00,ea,41,0
+cotton candy ice cream,Triple Scoop,,Ice Cream,18,$126.00,0,$0.00,$0.00,$126.00,$0.00,ea,18,0
+Cookie Monster,Single Scoop,,Ice Cream,18,$54.00,0,$0.00,$0.00,$54.00,$0.00,ea,18,0
+Cookie Monster,Double Scoop,,Ice Cream,17,$85.00,0,$0.00,$0.00,$85.00,$0.00,ea,17,0
+Peanut Butter Cup,Single Scoop,,Ice Cream,22,$66.00,0,$0.00,$0.00,$66.00,$0.00,ea,22,0
+Peanut Butter Cup,Double Scoop,,Ice Cream,15,$75.00,0,$0.00,$0.00,$75.00,$0.00,ea,15,0
+Strawberry Cheesecake,Single Scoop,,Ice Cream,14,$42.00,0,$0.00,$0.00,$42.00,$0.00,ea,14,0
+Strawberry Cheesecake,Double Scoop,,Ice Cream,12,$60.00,0,$0.00,$0.00,$60.00,$0.00,ea,12,0
+Super Duper Scoop,Regular,,Ice Cream,20,$160.00,0,$0.00,$0.00,$160.00,$0.00,ea,20,0
+Rainbow Sherbert,Single Scoop,,Ice Cream,16,$48.00,0,$0.00,$0.00,$48.00,$0.00,ea,16,0
+Rainbow Sherbert,Double Scoop,,Ice Cream,11,$55.00,0,$0.00,$0.00,$55.00,$0.00,ea,11,0
+Brownie Bandit,Single Scoop,,Ice Cream,13,$39.00,0,$0.00,$0.00,$39.00,$0.00,ea,13,0
+Brownie Bandit,Double Scoop,,Ice Cream,8,$40.00,0,$0.00,$0.00,$40.00,$0.00,ea,8,0
+Bomb Pop,Regular,,Novelty Ice Cream,85,$297.50,1,$3.50,$0.00,$294.00,$0.00,ea,85,1
+Cannonball!!!,Regular,,Novelty Ice Cream,50,$200.00,0,$0.00,$0.00,$200.00,$0.00,ea,50,0
+Cookie Sandwich,Regular,,Novelty Ice Cream,68,$272.00,0,$0.00,$0.00,$272.00,$0.00,ea,68,0
+Hawaiian Shaved Ice Ball,Regular,,Novelty Ice Cream,55,$192.50,0,$0.00,$0.00,$192.50,$0.00,ea,55,0
+Nerd Bomb Pop,Regular,,Novelty Ice Cream,48,$168.00,0,$0.00,$0.00,$168.00,$0.00,ea,48,0
+Ninja Turtles Ice Cream,Regular,,Novelty Ice Cream,75,$262.50,0,$0.00,$0.00,$262.50,$0.00,ea,75,0
+Rainbow Sherbet Float,Regular,,Novelty Ice Cream,38,$152.00,0,$0.00,$0.00,$152.00,$0.00,ea,38,0
+Root Beer Float,Regular,,Novelty Ice Cream,42,$168.00,0,$0.00,$0.00,$168.00,$0.00,ea,42,0
+Snickers Ice Cream Bar,Regular,,Novelty Ice Cream,45,$180.00,0,$0.00,$0.00,$180.00,$0.00,ea,45,0
+Sonic The Hedgehog,Regular,,Novelty Ice Cream,72,$252.00,0,$0.00,$0.00,$252.00,$0.00,ea,72,0
+Spiderman Ice Cream,Regular,,Novelty Ice Cream,77,$269.50,0,$0.00,$0.00,$269.50,$0.00,ea,77,0
+Spongebob Ice Cream,Regular,,Novelty Ice Cream,92,$322.00,0,$0.00,$0.00,$322.00,$0.00,ea,92,0
+Strawberry Shortcake Bar,Regular,,Novelty Ice Cream,63,$220.50,0,$0.00,$0.00,$220.50,$0.00,ea,63,0
+Twix Ice Cream Bar,Regular,,Novelty Ice Cream,51,$204.00,0,$0.00,$0.00,$204.00,$0.00,ea,51,0
+Airheads 2 for $1,Regular,,Candy,105,$105.00,0,$0.00,$0.00,$105.00,$0.00,ea,105,0
+Cotton Candy,Regular,,Candy,162,$486.00,1,$3.00,$0.00,$483.00,$0.00,ea,162,1
+Cow Tail,Regular,,Candy,80,$120.00,0,$0.00,$0.00,$120.00,$0.00,ea,80,0
+Nerds Clusters,Regular,,Candy,108,$162.00,0,$0.00,$0.00,$162.00,$0.00,ea,108,0
+Ring Pop,Regular,,Candy,68,$102.00,0,$0.00,$0.00,$102.00,$0.00,ea,68,0
+Slime Lickers,Regular,,Candy,120,$240.00,0,$0.00,$0.00,$240.00,$0.00,ea,120,0
+Sour Patch Kids,Regular,,Candy,118,$236.00,0,$0.00,$0.00,$236.00,$0.00,ea,118,0
+Starburst,Regular,,Candy,95,$190.00,0,$0.00,$0.00,$190.00,$0.00,ea,95,0
+Swedish Fish,Regular,,Candy,99,$198.00,0,$0.00,$0.00,$198.00,$0.00,ea,99,0
+Xtremes,Regular,,Candy,82,$164.00,0,$0.00,$0.00,$164.00,$0.00,ea,82,0
+Bottled Water,Regular,,Drinks,248,$496.00,2,$4.00,$0.00,$492.00,$0.00,ea,248,2
+Coca-Cola,Regular,,Drinks,138,$414.00,1,$3.00,$0.00,$411.00,$0.00,ea,138,1
+Dr. Pepper,Regular,,Drinks,125,$375.00,0,$0.00,$0.00,$375.00,$0.00,ea,125,0
+Gatorade Blue,Regular,,Drinks,110,$330.00,0,$0.00,$0.00,$330.00,$0.00,ea,110,0
+Gatorade Orange,Regular,,Drinks,88,$264.00,0,$0.00,$0.00,$264.00,$0.00,ea,88,0
+Gatorade Red,Regular,,Drinks,95,$285.00,0,$0.00,$0.00,$285.00,$0.00,ea,95,0
+Gatorade White,Regular,,Drinks,70,$210.00,0,$0.00,$0.00,$210.00,$0.00,ea,70,0
+Ice + Water,Regular,,Drinks,58,$58.00,0,$0.00,$0.00,$58.00,$0.00,ea,58,0
+Razzberry Tea,Regular,,Drinks,80,$240.00,0,$0.00,$0.00,$240.00,$0.00,ea,80,0
+Root Beer,Regular,,Drinks,105,$315.00,0,$0.00,$0.00,$315.00,$0.00,ea,105,0
+Souvenir Cup,Regular,,Drinks,62,$310.00,0,$0.00,$0.00,$310.00,$0.00,ea,62,0
+Soda Refill $1,Regular,,Drinks,138,$138.00,0,$0.00,$0.00,$138.00,$0.00,ea,138,0
+Hot dog,Regular,,Food,195,$780.00,1,$4.00,$0.00,$776.00,$0.00,ea,195,1
+Pizza Slice,Regular,,Food,378,$1512.00,3,$12.00,$0.00,$1500.00,$0.00,ea,378,3
+Chili Cheese Dog,Regular,,Food,75,$375.00,0,$0.00,$0.00,$375.00,$0.00,ea,75,0
+Chili Cheese Nachos,Regular,,Food,72,$396.00,1,$5.50,$0.00,$390.50,$0.00,ea,72,1
+Walking Taco,Regular,,Food,64,$384.00,0,$0.00,$0.00,$384.00,$0.00,ea,64,0
+Hot Dog Combo Meal,Regular,,Food,55,$412.50,1,$7.50,$0.00,$405.00,$0.00,ea,55,1
+Uncrustable,Regular,,Food,65,$227.50,0,$0.00,$0.00,$227.50,$0.00,ea,65,0
+Chicken Salad Sandwich,Regular,,Food,48,$336.00,0,$0.00,$0.00,$336.00,$0.00,ea,48,0
+BBQ Pork Sandwich,Regular,,Food,40,$320.00,0,$0.00,$0.00,$320.00,$0.00,ea,40,0
+Pulled Pork Sandwich,Regular,,Food,27,$216.00,0,$0.00,$0.00,$216.00,$0.00,ea,27,0
+Pulled Pork Nachos,Regular,,Food,58,$406.00,0,$0.00,$0.00,$406.00,$0.00,ea,58,0
+Cup of Cheese,Regular,,Food,88,$88.00,0,$0.00,$0.00,$88.00,$0.00,ea,88,0
+Whole Jet's Pizza,Regular,,Food,12,$300.00,0,$0.00,$0.00,$300.00,$0.00,ea,12,0
+Soft pretzel,Regular,,Snacks,512,$1536.00,2,$6.00,$0.00,$1530.00,$0.00,ea,512,2
+Assorted Chips,Regular,,Snacks,188,$470.00,0,$0.00,$0.00,$470.00,$0.00,ea,188,0
+Nachos & Cheese,Regular,,Snacks,158,$632.00,1,$4.00,$0.00,$628.00,$0.00,ea,158,1
+Jumbo Pickle,Regular,,Snacks,125,$375.00,0,$0.00,$0.00,$375.00,$0.00,ea,125,0
+String Cheese,Regular,,Snacks,88,$176.00,0,$0.00,$0.00,$176.00,$0.00,ea,88,0
+Frozen Grapes,Regular,,Snacks,78,$195.00,0,$0.00,$0.00,$195.00,$0.00,ea,78,0
+Hummus and Pita Chips,Regular,,Snacks,55,$192.50,0,$0.00,$0.00,$192.50,$0.00,ea,55,0
+Smoothies,Regular,,Snacks,80,$400.00,0,$0.00,$0.00,$400.00,$0.00,ea,80,0
