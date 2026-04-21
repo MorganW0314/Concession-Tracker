@@ -1165,14 +1165,14 @@ def consolidate_variants_to_base(
     writing logic runs — otherwise the Sales column stays empty for every
     base flavor that was only sold as Single/Double Scoop variants.
 
-    ⚠️  Scoop multipliers are applied automatically:
-        Each variant's numeric fields are scaled by scoops_from_item() before
-        being accumulated into the base row.  For example:
-            "Brownie Bandit Double Scoop": sales=35  →  35 × 2 = 70 scoops
-            "Brownie Bandit Single Scoop": sales=85  →  85 × 1 = 85 scoops
-            "Brownie Bandit" total:                      70 + 85 = 155 scoops ✅
-        Without this scaling, raw transaction counts would be summed (120),
-        understating the actual scoop usage.
+    This function performs SIMPLE consolidation — quantities are summed as-is
+    with NO scoop multipliers applied:
+        "Brownie Bandit Double Scoop": sales=35
+        "Brownie Bandit Single Scoop": sales=85
+        "Brownie Bandit" total:        35 + 85 = 120 items sold ✅
+
+    Scoop multipliers (Double=2, Triple=3) belong ONLY in group_scoops_by_flavor(),
+    which calculates scoops used for inventory tracking.
 
     ⚠️  ALWAYS call this on any ``rows`` dict that originates from CSV reading
     before passing it to write_full_week or any other sheet-writing function.
@@ -1206,16 +1206,11 @@ def consolidate_variants_to_base(
         variant_data = rows.pop(variant)
         base_data = rows[base]
 
-        # Accumulate every numeric field from the variant into the base row.
-        # For ice cream scoop variants, scale by the number of scoops per
-        # serving before adding — e.g. 35 "Double Scoop" sales = 70 scoops,
-        # not 35.  scoops_from_item() returns 1 for names without a scoop
-        # descriptor, so base-flavor rows (if ever present) are unaffected.
-        # Non-ice-cream categories never appear in SCOOP_VARIANT_TO_BASE, so
-        # they are never processed here and remain unchanged.
-        multiplier = scoops_from_item(variant)
+        # Simple accumulation: sum raw quantities with no multipliers.
+        # Scoop multipliers are applied only in group_scoops_by_flavor()
+        # for inventory (scoops used) calculations.
         for field in ("sales", "deliveries", "spoilage"):
-            base_data[field] = base_data.get(field, 0) + variant_data.get(field, 0) * multiplier
+            base_data[field] = base_data.get(field, 0) + variant_data.get(field, 0)
 
     return rows
 
@@ -1569,12 +1564,21 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
         CATEGORY_ORDER = DEFAULT_CATEGORY_ORDER
 
     # ============================
+    # ICE CREAM SCOOP TOTALS — compute BEFORE consolidation
+    # group_scoops_by_flavor must see the individual variant rows
+    # (e.g. "Brownie Bandit Double Scoop", "Brownie Bandit Single Scoop") so
+    # it can apply per-variant multipliers (Double=2, Triple=3).  After
+    # consolidate_variants_to_base() those variant rows are removed, so we
+    # must capture flavor_totals first.
+    # ============================
+    flavor_totals = group_scoops_by_flavor(rows)
+    tubs_used_map = tubs_used_from_scoops(flavor_totals)
+
+    # ============================
     # SCOOP VARIANT CONSOLIDATION
-    # ⚠️  MUST run first, before any other processing.
-    # CSV exports key ice cream sales under variant names such as
-    # "Brownie Bandit Double Scoop" while the sheet tracks only the base
-    # flavor "Brownie Bandit".  Without this step the Sales column for every
-    # base flavor sold exclusively as Single/Double Scoops stays empty.
+    # Merges variant rows into base-flavor rows using simple addition (no
+    # multipliers).  Sales = raw items sold (e.g. 120 for Brownie Bandit).
+    # Multipliers are applied only in group_scoops_by_flavor() above.
     # ============================
     consolidate_variants_to_base(rows)
 
@@ -1615,11 +1619,8 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     item_matcher = CategoryAwareItemMatcher(list(rows.keys()), category_map)
 
     # ============================
-    # ICE CREAM SCOOP + TUBS LOGIC
+    # ICE CREAM SCOOP + TUBS LOGIC — assign computed values to base rows
     # ============================
-    flavor_totals = group_scoops_by_flavor(rows)
-    tubs_used_map = tubs_used_from_scoops(flavor_totals)
-
     for flavor, scoops in flavor_totals.items():
         for tofts_flavor in TOFTS_ICE_CREAM:
             # Only assign scoops_used / tubs_used to the canonical BASE flavor
