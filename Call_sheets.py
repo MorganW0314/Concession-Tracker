@@ -476,25 +476,20 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
 
     Tab format (row 1 = header, rows 2+ = data):
       A: DATE              (optional, for record-keeping)
-      B: ITEM
-      C: TYPE              (optional; "Tubs" or "Units", defaults to "Units")
-      D: PACKAGES / QUANTITY
-      E: UNITS PER PACKAGE (optional, defaults to 1)
+      B: ITEM NAME
+      C: PACKAGES
+      D: UNITS_PER_PACKAGE (optional, defaults to 1)
 
-    Returns a dict: {item: {"display": qty, "scoops": qty}}
+    Returns a dict: {item: qty}
 
-    For Toft's ice cream items with TYPE="Tubs":
-      - display = packages  (what the employee entered; shown on the sheet)
-      - scoops  = packages × SCOOPS_PER_TUB  (used in Expected calculation)
+    For Toft's ice cream items (auto-detected from TOFTS_ICE_CREAM):
+      qty = packages × SCOOPS_PER_TUB  (already converted to scoops)
 
-    For all other items (TYPE="Units" or no TYPE column):
-      - display = packages × units_per
-      - scoops  = packages × units_per  (same value — no conversion needed)
+    For all other items:
+      qty = packages × units_per  (already in units)
 
     Column positions are resolved from the header row so the function is
-    resilient to column re-ordering or renamed headers.  When no header row
-    exists, positional defaults assume the old three-column layout (A=date,
-    B=item, C=packages, D=units_per) without a TYPE column.
+    resilient to column re-ordering or renamed headers.
 
     When week_start_date and week_end_date are provided (as datetime.date
     objects), only rows whose Column-A date falls within that inclusive range
@@ -518,9 +513,8 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         return default
 
     item_idx  = _col_idx({"item", "item name"}, 1)
-    type_idx  = _col_idx({"type", "unit type", "delivery type"}, None)
     qty_idx   = _col_idx({"packages", "quantity", "qty", "packages / quantity", "packages/quantity"}, 2)
-    units_idx = _col_idx({"units per package", "units per", "units/pkg", "units/package"}, 3)
+    units_idx = _col_idx({"units per package", "units per", "units_per_package", "units/pkg", "units/package"}, 3)
 
     # --- Read data rows ---
     range_str = f"'{tab}'!A2:E200"
@@ -567,43 +561,24 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         except (ValueError, IndexError):
             units_per = 1
 
-        # --- Type column: convert tubs → scoops when delivery type is "tubs" ---
-        delivery_type = "units"
-        if type_idx is not None:
-            try:
-                raw_type = row[type_idx].strip().lower() if len(row) > type_idx and row[type_idx] else ""
-                delivery_type = raw_type if raw_type else "units"
-            except (ValueError, IndexError):
-                delivery_type = "units"
-
-        # Determine display and scoops values separately.
-        # For Toft's ice cream delivered in tubs:
-        #   display = packages (the tub count employees see on the sheet)
-        #   scoops  = packages × SCOOPS_PER_TUB (used in Expected formula math)
-        # For everything else:
-        #   display = scoops = packages × units_per (no conversion needed)
+        # Auto-detect Toft's ice cream: convert tubs → scoops automatically.
+        # All other items: multiply packages × units_per to get total units.
         is_tofts_ice_cream = any(
             item.lower() == tofts_item.lower()
             for tofts_item in TOFTS_ICE_CREAM
         )
 
-        if delivery_type == "tubs" and is_tofts_ice_cream:
-            display_qty = packages
-            scoops_qty  = packages * SCOOPS_PER_TUB
+        if is_tofts_ice_cream:
+            qty = packages * SCOOPS_PER_TUB
             print(
-                f"  [Deliveries] '{item}': {packages} tub(s) displayed; "
-                f"{scoops_qty} scoops used in Expected formula"
+                f"  [Deliveries] '{item}': {packages} tub(s) → "
+                f"{qty} scoops"
             )
         else:
-            display_qty = packages * units_per
-            scoops_qty  = packages * units_per
+            qty = packages * units_per
 
         # ACCUMULATE so mid-week deliveries are summed, not overwritten
-        existing = deliveries.get(item, {"display": 0, "scoops": 0})
-        deliveries[item] = {
-            "display": existing["display"] + display_qty,
-            "scoops":  existing["scoops"]  + scoops_qty,
-        }
+        deliveries[item] = deliveries.get(item, 0) + qty
 
     return deliveries
 
@@ -1137,9 +1112,13 @@ _TOFTS_BASE_FLAVORS = [
 # This dict provides an explicit override so group_scoops_by_flavor can resolve
 # each variant to its canonical base before checking TOFTS_ICE_CREAM.
 SCOOP_VARIANT_TO_BASE = {
-    "Cotton Candy Double Scoop": "Cotton Candy Ice Cream",
-    "Mint Chip Double":          "Mint Chip",
-    "Super Duper Scoop Double":  "Super Duper Scoop",
+    "Cotton Candy Double Scoop":          "Cotton Candy Ice Cream",
+    "Mint Chip Double":                   "Mint Chip",
+    "Mint Chip Double Scoop":             "Mint Chip",
+    "Super Duper Scoop Double":           "Super Duper Scoop",
+    "Super Duper Scoop Double Scoop":     "Super Duper Scoop",
+    "Strawberry Cheesecake Single Scoop": "Strawberry Cheesecake",
+    "Strawberry Cheesecake Double Scoop": "Strawberry Cheesecake",
 }
 
 # Full list: base flavors + all scoop variants found in the CSV.
@@ -1170,11 +1149,13 @@ TOFTS_ICE_CREAM = [
     "Cookies & Cream Double Scoop",
     "Cotton Candy Double Scoop",
     "Mint Chip Double",
+    "Mint Chip Double Scoop",
     "Peanut Butter Cup Double Scoop",
     "Rainbow Sherbert Double Scoop",
     "Strawberry Cheesecake Single Scoop",
     "Strawberry Cheesecake Double Scoop",
     "Super Duper Scoop Double",
+    "Super Duper Scoop Double Scoop",
     "Vanilla Double Scoop",
 ]
 
@@ -1605,11 +1586,10 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
         week_end_date=week_end_date,
     )
     unmatched_deliveries = []
-    for delivery_item, delivery_data in delivery_totals.items():
+    for delivery_item, qty in delivery_totals.items():
         matched = item_matcher.find_match(delivery_item)
         if matched and matched in rows:
-            rows[matched]["deliveries_display"] = delivery_data["display"]
-            rows[matched]["deliveries_scoops"]  = delivery_data["scoops"]
+            rows[matched]["deliveries"] = rows[matched].get("deliveries", 0) + qty
         else:
             unmatched_deliveries.append(delivery_item)
     audit_logger.log_deliveries_read(delivery_totals, unmatched_deliveries)
@@ -1619,7 +1599,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     # ============================
     expected_totals = calculate_expected_inventory(
         {item: rows[item].get("starting", 0) for item in rows},
-        {item: rows[item].get("deliveries_scoops", 0) for item in rows},
+        {item: rows[item].get("deliveries", 0) for item in rows},
         {item: rows[item].get("sales", 0) for item in rows},
         {item: rows[item].get("spoilage", 0) for item in rows},
     )
@@ -1703,12 +1683,15 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
             item_data = rows.get(item, {})
 
             # Spreadsheet formulas (use USER_ENTERED so Sheets evaluates them).
-            # For Toft's ice cream the Deliveries column stores tubs (the display
-            # value), so we must multiply by SCOOPS_PER_TUB in the formula and
-            # subtract Scoops Used (from POS) rather than the raw Sales count.
+            # Deliveries are already converted to the correct unit:
+            #   Toft's ice cream → scoops (packages × 60 done in read_deliveries)
+            #   All other items  → units  (packages × units_per)
+            # So Expected uses the same structure for every item:
+            #   Toft's:    Starting + Deliveries - ScoopsUsed - Spoilage
+            #   Non-Toft's: Starting + Deliveries - Sales - Spoilage
             if is_tofts:
                 expected_formula = (
-                    f"={s_col}{row_num}+{d_col}{row_num}*{SCOOPS_PER_TUB}"
+                    f"={s_col}{row_num}+{d_col}{row_num}"
                     f"-{sc_col}{row_num}-{sp_col}{row_num}"
                 )
             else:
@@ -1733,8 +1716,8 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
             )
 
             row_values = [
-                item_data.get("starting", 0),            # Starting
-                item_data.get("deliveries_display", 0),  # Deliveries (tubs for ice cream, units otherwise)
+                item_data.get("starting", 0),        # Starting
+                item_data.get("deliveries", 0),      # Deliveries (scoops for ice cream, units otherwise)
                 item_data.get("sales", 0),               # Sales
                 item_data.get("spoilage", 0),            # Spoilage
                 expected_formula,                    # Expected (formula)
