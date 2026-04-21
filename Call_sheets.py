@@ -1165,9 +1165,22 @@ def consolidate_variants_to_base(
     writing logic runs — otherwise the Sales column stays empty for every
     base flavor that was only sold as Single/Double Scoop variants.
 
+    ⚠️  Scoop multipliers are applied automatically:
+        Each variant's numeric fields are scaled by scoops_from_item() before
+        being accumulated into the base row.  For example:
+            "Brownie Bandit Double Scoop": sales=35  →  35 × 2 = 70 scoops
+            "Brownie Bandit Single Scoop": sales=85  →  85 × 1 = 85 scoops
+            "Brownie Bandit" total:                      70 + 85 = 155 scoops ✅
+        Without this scaling, raw transaction counts would be summed (120),
+        understating the actual scoop usage.
+
     ⚠️  ALWAYS call this on any ``rows`` dict that originates from CSV reading
     before passing it to write_full_week or any other sheet-writing function.
     Skipping this step causes the Sales column to show 0 for affected flavors.
+
+    ⚠️  Only Toft's ice cream scoop variants (all entries in SCOOP_VARIANT_TO_BASE)
+    go through this path.  CANDY, DRINKS, MEALS, SNACKS, NOVELTY ICE CREAM, and
+    all other categories are never in variant_map and are never modified here.
 
     Args:
         rows:        Dict mapping item_name -> data_dict (mutated in-place).
@@ -1194,8 +1207,15 @@ def consolidate_variants_to_base(
         base_data = rows[base]
 
         # Accumulate every numeric field from the variant into the base row.
+        # For ice cream scoop variants, scale by the number of scoops per
+        # serving before adding — e.g. 35 "Double Scoop" sales = 70 scoops,
+        # not 35.  scoops_from_item() returns 1 for names without a scoop
+        # descriptor, so base-flavor rows (if ever present) are unaffected.
+        # Non-ice-cream categories never appear in SCOOP_VARIANT_TO_BASE, so
+        # they are never processed here and remain unchanged.
+        multiplier = scoops_from_item(variant)
         for field in ("sales", "deliveries", "spoilage"):
-            base_data[field] = base_data.get(field, 0) + variant_data.get(field, 0)
+            base_data[field] = base_data.get(field, 0) + variant_data.get(field, 0) * multiplier
 
     return rows
 
