@@ -71,10 +71,11 @@ class ConcessionApp(tk.Tk):
     # Styles / fonts
     # ----------------------------------------------------------
     def _configure_styles(self):
-        self._font_label  = tkfont.Font(family="Segoe UI", size=11)
-        self._font_header = tkfont.Font(family="Segoe UI", size=13, weight="bold")
-        self._font_log    = tkfont.Font(family="Consolas",  size=9)
-        self._font_btn    = tkfont.Font(family="Segoe UI", size=12, weight="bold")
+        self._font_label   = tkfont.Font(family="Segoe UI", size=11)
+        self._font_header  = tkfont.Font(family="Segoe UI", size=13, weight="bold")
+        self._font_log     = tkfont.Font(family="Consolas",  size=9)
+        self._font_btn     = tkfont.Font(family="Segoe UI", size=12, weight="bold")
+        self._font_success = tkfont.Font(family="Segoe UI", size=12, weight="bold")
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -204,8 +205,7 @@ class ConcessionApp(tk.Tk):
         self._log_text.tag_configure("ERROR",    foreground="#f44747")
         self._log_text.tag_configure("CRITICAL", foreground="#f44747")
         self._log_text.tag_configure("INFO",     foreground="#9cdcfe")
-        self._log_text.tag_configure("SUCCESS",  foreground="#4ec94e", font=tkfont.Font(
-            family="Segoe UI", size=12, weight="bold"))
+        self._log_text.tag_configure("SUCCESS",  foreground="#4ec94e", font=self._font_success)
 
         # Attach logging handler
         self._log_handler = _TextWidgetHandler(self._log_text)
@@ -303,7 +303,7 @@ class ConcessionApp(tk.Tk):
             self.after(0, self._on_success, stand_name)
 
         except Exception as exc:
-            logging.getLogger(__name__).error("Processing failed: %s", exc, exc_info=True)
+            logging.getLogger(__name__).error("Processing failed:", exc_info=True)
             self.after(0, self._on_error)
 
     def _on_success(self, stand_name):
