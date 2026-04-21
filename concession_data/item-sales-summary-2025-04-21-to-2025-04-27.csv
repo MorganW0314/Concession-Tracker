@@ -1,0 +1,69 @@
+Item Name,Item Variation,SKU,Category,Items Sold,Gross Sales,Items Refunded,Refunds,Discounts & Comps,Net Sales,Tax,Unit,Units Sold,Units Refunded
+Airheads 2 for $1,Regular,.29,Candy,520,"$520.00",0,"$0.00","-$18.00","$502.00","$0.00",ea,520,0
+Cotton Candy,Regular,.965,Candy,210,"$630.00",0,"$0.00","-$12.00","$618.00","$0.00",ea,210,0
+Cow Tail,Regular,.421,Candy,145,"$145.00",0,"$0.00","-$6.00","$139.00","$0.00",ea,145,0
+Nerds Clusters,Regular,"",Candy,115,"$345.00",0,"$0.00","-$10.00","$335.00","$0.00",ea,115,0
+Ring Pop,Regular,0.348,Candy,310,"$310.00",0,"$0.00","-$2.50","$307.50","$0.00",ea,310,0
+Slime Lickers,Regular,1.95,Candy,88,"$440.00",0,"$0.00","-$3.00","$437.00","$0.00",ea,88,0
+Sour Patch Kids,Regular,.590,Candy,145,"$362.50",0,"$0.00","-$3.50","$359.00","$0.00",ea,145,0
+Starburst,Regular,"",Candy,105,"$262.50",0,"$0.00","-$6.00","$256.50","$0.00",ea,105,0
+Swedish Fish,Regular,.5901,Candy,135,"$337.50",0,"$0.00","-$6.50","$331.00","$0.00",ea,135,0
+Xtremes,Regular,.666,Candy,295,"$737.50",0,"$0.00","-$18.00","$719.50","$0.00",ea,295,0
+Bottled Water,Regular,.5,Drinks,225,"$562.50",0,"$0.00","-$6.00","$556.50","$0.00",ea,225,0
+Coca-Cola,Regular,.55,Drinks,115,"$287.50",0,"$0.00","-$2.50","$285.00","$0.00",ea,115,0
+Dr. Pepper,Regular,.461,Drinks,145,"$362.50",0,"$0.00","-$6.00","$356.50","$0.00",ea,145,0
+Gatorade Blue,Regular,1.03,Drinks,105,"$300.00",0,"$0.00","-$12.00","$288.00","$0.00",ea,105,0
+Gatorade Red,Regular,1.03,Drinks,80,"$232.50",0,"$0.00","-$6.00","$226.50","$0.00",ea,80,0
+Soda Refill ($1),Regular,"",Drinks,215,"$215.00",0,"$0.00","-$9.50","$205.50","$0.00",ea,215,0
+BBQ Pork Sandwich,Regular,1.54,Food,80,"$400.00",0,"$0.00","-$12.00","$388.00","$0.00",ea,80,0
+Chicken Salad Sandwich,Regular,1.25,Food,55,"$247.50",0,"$0.00","-$6.00","$241.50","$0.00",ea,55,0
+Chili Cheese Dog,Regular,1.25,Food,70,"$315.00",0,"$0.00","-$4.00","$311.00","$0.00",ea,70,0
+Hot dog,Regular,.45,Food,575,"$2,012.50",0,"$0.00","-$30.00","$1,982.50","$0.00",ea,575,0
+Pizza Slice,Regular,1,Food,495,"$1,607.50",0,"$0.00","-$18.00","$1,589.50","$0.00",ea,495,0
+Uncrustable,Regular,.77,Food,68,"$204.00",0,"$0.00","-$3.50","$200.50","$0.00",ea,68,0
+Frozen Grapes,Regular,"",Fresh,145,"$435.00",0,"$0.00","-$9.50","$425.50","$0.00",ea,145,0
+Hummus and Pita Chips,Regular,"",Fresh,55,"$165.00",0,"$0.00","-$4.00","$161.00","$0.00",ea,55,0
+Smoothies,Regular,1.29,Fresh,50,"$250.00",0,"$0.00","-$2.00","$248.00","$0.00",ea,50,0
+String Cheese,Regular,"",Fresh,42,"$42.00",0,"$0.00","$0.00","$42.00","$0.00",ea,42,0
+Bomb Pop,Regular,1.09,Ice Cream,115,"$402.50",0,"$0.00","-$2.50","$400.00","$0.00",ea,115,0
+Cannonball!!!,Regular,.61,Ice Cream,145,"$725.00",0,"$0.00","-$6.00","$719.00","$0.00",ea,145,0
+Cookie Sandwich,Regular,1.38,Ice Cream,335,"$1,172.50",0,"$0.00","-$25.00","$1,147.50","$0.00",ea,335,0
+Hawaiian Shaved Ice Ball,Regular,.65,Ice Cream,420,"$1,680.00",0,"$0.00","-$10.00","$1,670.00","$0.00",ea,420,0
+Nerd Bomb Pop,Regular,1.09,Ice Cream,110,"$385.00",0,"$0.00","$0.00","$385.00","$0.00",ea,110,0
+Root Beer Float,Regular,.95,Ice Cream,145,"$580.00",0,"$0.00","-$4.00","$576.00","$0.00",ea,145,0
+Snickers Ice Cream Bar,Regular,1.25,Ice Cream,105,"$367.50",0,"$0.00","-$3.00","$364.50","$0.00",ea,105,0
+Sonic The Hedgehog,Regular,1.3,Ice Cream,115,"$402.50",0,"$0.00","-$2.50","$400.00","$0.00",ea,115,0
+Spiderman Ice Cream,Regular,.80,Ice Cream,120,"$420.00",0,"$0.00","-$2.50","$417.50","$0.00",ea,120,0
+Spongebob Ice Cream,Regular,1.05,Ice Cream,220,"$770.00",0,"$0.00","-$6.00","$764.00","$0.00",ea,220,0
+Strawberry Shortcake Bar,Regular,1.26,Ice Cream,160,"$560.00",0,"$0.00","-$5.00","$555.00","$0.00",ea,160,0
+Twix Ice Cream Bar,Regular,1.25,Ice Cream,190,"$665.00",0,"$0.00","-$18.00","$647.00","$0.00",ea,190,0
+Assorted Chips,Regular,.37,Snacks,420,"$630.00",0,"$0.00","-$14.00","$616.00","$0.00",ea,420,0
+Jumbo Pickle,Regular,.2,Snacks,180,"$324.00",0,"$0.00","-$6.00","$318.00","$0.00",ea,180,0
+Nachos & Cheese,Regular,1.14,Snacks,295,"$1,180.00",0,"$0.00","-$12.00","$1,168.00","$0.00",ea,295,0
+Soft pretzel,Regular,.441,Snacks,1850,"$6,097.50",0,"$0.00","-$90.00","$6,007.50","$0.00",ea,1850,0
+Walking Taco,Regular,"",Snacks,115,"$460.00",0,"$0.00","-$6.00","$454.00","$0.00",ea,115,0
+Brownie Bandit Double Scoop,Regular,1,Toft's,42,"$189.00",0,"$0.00","-$3.00","$186.00","$0.00",ea,42,0
+Brownie Bandit Single Scoop,Regular,.6,Toft's,105,"$367.50",0,"$0.00","-$12.00","$355.50","$0.00",ea,105,0
+Chocolate,Regular,.471,Toft's,215,"$752.50",0,"$0.00","-$10.00","$742.50","$0.00",ea,215,0
+Chocolate Double Scoop,Regular,.86,Toft's,68,"$306.00",0,"$0.00","-$2.50","$303.50","$0.00",ea,68,0
+Cookie Dough,Regular,.511,Toft's,210,"$735.00",0,"$0.00","-$14.00","$721.00","$0.00",ea,210,0
+Cookie Dough Double Scoop,Regular,.931,Toft's,98,"$441.00",0,"$0.00","-$4.00","$437.00","$0.00",ea,98,0
+Cookie Monster,Regular,.5111,Toft's,260,"$910.00",0,"$0.00","-$18.00","$892.00","$0.00",ea,260,0
+Cookie Monster Double Scoop,Regular,.9311,Toft's,145,"$652.50",0,"$0.00","-$10.00","$642.50","$0.00",ea,145,0
+Cookies N Cream,Regular,.51111,Toft's,185,"$647.50",0,"$0.00","-$10.00","$637.50","$0.00",ea,185,0
+Cookies N Cream Double Scoop,Regular,.93111,Toft's,80,"$360.00",0,"$0.00","-$2.50","$357.50","$0.00",ea,80,0
+cotton candy ice cream,Regular,.50,Toft's,255,"$892.50",0,"$0.00","-$10.00","$882.50","$0.00",ea,255,0
+Cotton Candy Double Scoop,Regular,.941,Toft's,68,"$306.00",0,"$0.00","-$2.50","$303.50","$0.00",ea,68,0
+Mint Chip,Regular,.47111,Toft's,198,"$693.00",0,"$0.00","-$10.00","$683.00","$0.00",ea,198,0
+Mint Chip Double,Regular,.861,Toft's,75,"$337.50",0,"$0.00","-$2.00","$335.50","$0.00",ea,75,0
+Peanut Butter Cup,Regular,.5,Toft's,105,"$367.50",0,"$0.00","-$6.00","$361.50","$0.00",ea,105,0
+Peanut Butter Cup Double Scoop,Regular,.9,Toft's,55,"$247.50",0,"$0.00","-$2.00","$245.50","$0.00",ea,55,0
+Rainbow Sherbert,Regular,.470,Toft's,55,"$192.50",0,"$0.00","$0.00","$192.50","$0.00",ea,55,0
+Rainbow Sherbert Double Scoop,Regular,.860,Toft's,18,"$81.00",0,"$0.00","$0.00","$81.00","$0.00",ea,18,0
+Strawberry Cheesecake Double Scoop,Regular,"",Toft's,30,"$135.00",0,"$0.00","-$2.00","$133.00","$0.00",ea,30,0
+Strawberry Cheesecake Single Scoop,Regular,"",Toft's,42,"$147.00",0,"$0.00","-$2.50","$144.50","$0.00",ea,42,0
+Super Duper Scoop,Regular,.4600,Toft's,72,"$252.00",0,"$0.00","-$1.50","$250.50","$0.00",ea,72,0
+Super Duper Scoop Double,Regular,.8700,Toft's,25,"$112.50",0,"$0.00","$0.00","$112.50","$0.00",ea,25,0
+Vanilla,Regular,.46001,Toft's,180,"$630.00",0,"$0.00","-$4.00","$626.00","$0.00",ea,180,0
+Vanilla Double Scoop,Regular,.870,Toft's,62,"$279.00",0,"$0.00","-$1.50","$277.50","$0.00",ea,62,0
+Whole Jet's Pizza,Regular,8,whole pizza,42,"$840.00",0,"$0.00","$0.00","$840.00","$0.00",ea,42,0
