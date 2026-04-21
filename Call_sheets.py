@@ -1683,22 +1683,11 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
             item_data = rows.get(item, {})
 
             # Spreadsheet formulas (use USER_ENTERED so Sheets evaluates them).
-            # Deliveries are already converted to the correct unit:
-            #   Toft's ice cream → scoops (packages × 60 done in read_deliveries)
-            #   All other items  → units  (packages × units_per)
-            # So Expected uses the same structure for every item:
-            #   Toft's:    Starting + Deliveries - ScoopsUsed - Spoilage
-            #   Non-Toft's: Starting + Deliveries - Sales - Spoilage
-            if is_tofts:
-                expected_formula = (
-                    f"={s_col}{row_num}+{d_col}{row_num}"
-                    f"-{sc_col}{row_num}-{sp_col}{row_num}"
-                )
-            else:
-                expected_formula = (
-                    f"={s_col}{row_num}+{d_col}{row_num}"
-                    f"-{sa_col}{row_num}-{sp_col}{row_num}"
-                )
+            # Expected = Starting + Deliveries - Sales - Spoilage for all items.
+            expected_formula = (
+                f"={s_col}{row_num}+{d_col}{row_num}"
+                f"-{sa_col}{row_num}-{sp_col}{row_num}"
+            )
             # Actual = Individuals + Cases/Packs × Qty Per Case.
             # Returns blank until at least one helper column is filled in.
             # NEW (CORRECT):
