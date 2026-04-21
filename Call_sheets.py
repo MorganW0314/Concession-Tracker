@@ -1102,24 +1102,102 @@ _TOFTS_BASE_FLAVORS = [
     "Brownie Bandit",
 ]
 
-# Some CSV item names don't normalize (via normalize_flavor) to the same
-# string as their base flavor.  For example:
-#   "Cotton Candy Double Scoop" → strips "double scoop" → "cotton candy"
-#                                  ≠ normalize("Cotton Candy Ice Cream") = "cotton candy ice cream"
-#   "Mint Chip Double"          → no recognized suffix stripped → "mint chip double"
-#                                  ≠ "mint chip"
-#   "Super Duper Scoop Double"  → "super duper scoop double" ≠ "super duper"
-# This dict provides an explicit override so group_scoops_by_flavor can resolve
-# each variant to its canonical base before checking TOFTS_ICE_CREAM.
-SCOOP_VARIANT_TO_BASE = {
+# Comprehensive mapping of every CSV scoop-variant name → canonical base flavor.
+#
+# ⚠️  KEEP THIS MAPPING COMPLETE.
+# When a new scoop variant appears in the POS CSV, add it here so that
+# consolidate_variants_to_base() (called at the start of write_full_week)
+# folds it into the correct base-flavor bucket.  Omitting a variant here
+# causes its sales/deliveries/spoilage to be silently dropped.
+#
+# This dict serves two purposes:
+#   1. group_scoops_by_flavor() – resolves variant name → base before counting
+#      scoops (handles names that don't auto-normalize, e.g. "Cotton Candy
+#      Double Scoop" → "cotton candy" ≠ "cotton candy ice cream").
+#   2. consolidate_variants_to_base() – merges ALL numeric row data
+#      (sales, deliveries, spoilage) from variant keys into base-flavor keys
+#      so the sheet's Sales column is populated correctly.
+SCOOP_VARIANT_TO_BASE: dict[str, str] = {
+    # Brownie Bandit
+    "Brownie Bandit Single Scoop":        "Brownie Bandit",
+    "Brownie Bandit Double Scoop":        "Brownie Bandit",
+    # Chocolate
+    "Chocolate Single Scoop":             "Chocolate",
+    "Chocolate Double Scoop":             "Chocolate",
+    # Cookie Dough
+    "Cookie Dough Double Scoop":          "Cookie Dough",
+    # Cookie Monster
+    "Cookie Monster Double Scoop":        "Cookie Monster",
+    # Cookies & Cream
+    "Cookies & Cream Double Scoop":       "Cookies & Cream",
+    # Cotton Candy (base name differs: "Cotton Candy Ice Cream")
     "Cotton Candy Double Scoop":          "Cotton Candy Ice Cream",
+    # Mint Chip (variant names differ from base)
     "Mint Chip Double":                   "Mint Chip",
     "Mint Chip Double Scoop":             "Mint Chip",
-    "Super Duper Scoop Double":           "Super Duper Scoop",
-    "Super Duper Scoop Double Scoop":     "Super Duper Scoop",
+    # Peanut Butter Cup
+    "Peanut Butter Cup Double Scoop":     "Peanut Butter Cup",
+    # Rainbow Sherbert
+    "Rainbow Sherbert Double Scoop":      "Rainbow Sherbert",
+    # Strawberry Cheesecake
     "Strawberry Cheesecake Single Scoop": "Strawberry Cheesecake",
     "Strawberry Cheesecake Double Scoop": "Strawberry Cheesecake",
+    # Super Duper Scoop (variant names differ from base)
+    "Super Duper Scoop Double":           "Super Duper Scoop",
+    "Super Duper Scoop Double Scoop":     "Super Duper Scoop",
+    # Vanilla
+    "Vanilla Double Scoop":               "Vanilla",
 }
+
+
+def consolidate_variants_to_base(
+    rows: dict,
+    variant_map: dict[str, str] | None = None,
+) -> dict:
+    """Merge ice cream scoop variant entries into their canonical base flavors.
+
+    POS CSV exports list scoop variants as separate line items, e.g.:
+        "Brownie Bandit Double Scoop"  (35 units)
+        "Brownie Bandit Single Scoop"  (85 units)
+
+    The sheet tracks only the canonical base flavor ("Brownie Bandit"), so
+    variant keys must be folded into the base-flavor key *before* any sheet-
+    writing logic runs — otherwise the Sales column stays empty for every
+    base flavor that was only sold as Single/Double Scoop variants.
+
+    ⚠️  ALWAYS call this on any ``rows`` dict that originates from CSV reading
+    before passing it to write_full_week or any other sheet-writing function.
+    Skipping this step causes the Sales column to show 0 for affected flavors.
+
+    Args:
+        rows:        Dict mapping item_name -> data_dict (mutated in-place).
+                     Each data_dict may contain "sales", "deliveries",
+                     "spoilage", "starting", and other numeric fields.
+        variant_map: Mapping of variant_name -> base_name.  Defaults to
+                     SCOOP_VARIANT_TO_BASE.  Override only in tests.
+
+    Returns:
+        The same ``rows`` dict (mutated in-place) for convenient chaining.
+    """
+    if variant_map is None:
+        variant_map = SCOOP_VARIANT_TO_BASE
+
+    for variant, base in variant_map.items():
+        if variant not in rows:
+            continue
+
+        # Ensure the base-flavor key exists before merging.
+        if base not in rows:
+            rows[base] = {"starting": 0, "deliveries": 0, "sales": 0, "spoilage": 0}
+
+        variant_data = rows.pop(variant)
+        base_data = rows[base]
+
+        # Accumulate every numeric field from the variant into the base row.
+        for field in ("sales", "deliveries", "spoilage"):
+            base_data[field] = base_data.get(field, 0) + variant_data.get(field, 0)
+
+    return rows
 
 # Full list: base flavors + all scoop variants found in the CSV.
 # Used ONLY for CSV-item recognition (group_scoops_by_flavor, read_deliveries,
@@ -1469,6 +1547,16 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
         CATEGORY_ORDER = list(category_map.items())
     else:
         CATEGORY_ORDER = DEFAULT_CATEGORY_ORDER
+
+    # ============================
+    # SCOOP VARIANT CONSOLIDATION
+    # ⚠️  MUST run first, before any other processing.
+    # CSV exports key ice cream sales under variant names such as
+    # "Brownie Bandit Double Scoop" while the sheet tracks only the base
+    # flavor "Brownie Bandit".  Without this step the Sales column for every
+    # base flavor sold exclusively as Single/Double Scoops stays empty.
+    # ============================
+    consolidate_variants_to_base(rows)
 
     # ============================
     # INGREDIENT-BASED SALES EXPANSION (per-stand, not consolidated)
