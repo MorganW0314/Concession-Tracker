@@ -1616,7 +1616,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     audit_logger = AuditLogger(stand_name)
     validator    = DataValidator()
     category_map = CategoryAwareItemMatcher.build_category_map(CATEGORY_ORDER)
-    item_matcher = CategoryAwareItemMatcher(list(rows.keys()), category_map)
+    item_matcher = CategoryAwareItemMatcher(list(rows.keys()), category_map, threshold=0.65)
 
     # ============================
     # ICE CREAM SCOOP + TUBS LOGIC — assign computed values to base rows
