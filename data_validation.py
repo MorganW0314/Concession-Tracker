@@ -12,6 +12,7 @@ This module provides:
 import json
 import logging
 import os
+import re
 from datetime import date, datetime
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional, Tuple
@@ -77,13 +78,15 @@ class ItemMatcher:
         matcher.find_match("Unknown Item")       # Returns None (logged)
     """
 
-    def __init__(self, canonical_items: List[str], threshold: float = 0.85):
+    def __init__(self, canonical_items: List[str], threshold: float = 0.65):
         """
         Args:
             canonical_items: Authoritative list of item names.
             threshold: Minimum SequenceMatcher ratio (0–1) required to accept
-                       a fuzzy match.  Default 0.85 is deliberately conservative
-                       to avoid false positives.
+                       a fuzzy match.  Default 0.65 is intentionally loose so
+                       that employees typing partial names, typos, or names
+                       without price suffixes (e.g. "airheads" for
+                       "Airheads 2 for $1") still find the correct item.
         """
         self.canonical_items = list(canonical_items)
         self.threshold = threshold
@@ -92,8 +95,27 @@ class ItemMatcher:
 
     @staticmethod
     def _normalize(name: str) -> str:
-        """Lightweight normalisation: lowercase, strip, collapse whitespace."""
-        return " ".join(name.lower().strip().split())
+        """Normalise a name for fuzzy comparison.
+
+        Steps:
+        1. Lowercase and strip surrounding whitespace.
+        2. Strip price suffixes like "2 for $1", "3 for $2", "($1.50)", etc.
+        3. Normalise "&" → "n" so "Cookies & Cream" and "Cookies N Cream"
+           compare as identical strings.
+        4. Remove apostrophes and other non-alphanumeric/space characters.
+        5. Collapse runs of whitespace.
+        """
+        text = name.lower().strip()
+        # Strip price suffixes: "2 for $1", "3 for $2", "2 for $1.50", etc.
+        text = re.sub(r'\d+\s+for\s+\$[\d.]+', '', text)
+        # Strip parenthesised prices: "($1)", "($1.50)"
+        text = re.sub(r'\(\s*\$[\d.]+\s*\)', '', text)
+        # Normalise "&" to "n" so "Cookies & Cream" == "Cookies N Cream"
+        text = text.replace('&', 'n')
+        # Remove apostrophes and other non-alphanumeric/space characters
+        text = re.sub(r"[^\w\s]", ' ', text)
+        # Collapse whitespace
+        return ' '.join(text.split())
 
     def find_match(self, item_name: str) -> Optional[str]:
         """Return the best canonical match for *item_name*, or ``None``."""
@@ -191,7 +213,7 @@ class CategoryAwareItemMatcher(ItemMatcher):
         self,
         canonical_items: List[str],
         category_map: Dict[str, str],
-        threshold: float = 0.85,
+        threshold: float = 0.65,
     ):
         """
         Args:
@@ -199,7 +221,7 @@ class CategoryAwareItemMatcher(ItemMatcher):
             category_map:    Mapping of *canonical item name* → *category label*.
                              Build this with :meth:`build_category_map`.
             threshold:       Minimum SequenceMatcher ratio required to accept a
-                             fuzzy match.  Default 0.85 matches the base class.
+                             fuzzy match.  Default 0.65 matches the base class.
         """
         super().__init__(canonical_items, threshold)
         self.category_map: Dict[str, str] = dict(category_map)
