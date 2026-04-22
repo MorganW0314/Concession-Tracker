@@ -1,11 +1,13 @@
 import os
 import glob
 import logging
+import re
 import threading
 import tkinter as tk
+from datetime import datetime
 from tkinter import ttk, font as tkfont
 
-from Take_items import take_items   # your CSV ingestion function
+from Take_items import take_items, take_modifiers   # CSV ingestion functions
 from Call_sheets import write_full_week
 from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
@@ -16,6 +18,45 @@ from google.oauth2.service_account import Credentials
 SPREADSHEET_ID = "13MhJ9cykz_l89PvV2KrVHHL2-TEos6JWt43dMMYFR1U"
 
 CREDENTIALS_PATH = r"C:\Users\willi\OneDrive\Desktop\inventory_Script\Credentials-personal.json"
+
+
+# ------------------------------------------------------------
+# MODIFIER CSV HELPERS
+# ------------------------------------------------------------
+
+def _find_modifier_csv(folder):
+    """Return the path to a modifier CSV in *folder*, or None if not found.
+
+    Looks for any ``*.csv`` file whose name contains "modifier" (case-insensitive).
+    """
+    pattern = os.path.join(folder, "*.csv")
+    for path in sorted(glob.glob(pattern)):
+        if "modifier" in os.path.basename(path).lower():
+            return path
+    return None
+
+
+def _parse_week_from_csv_name(csv_file):
+    """Parse week start/end dates from an item-sales CSV filename.
+
+    Expects a filename containing ``YYYY-MM-DD-to-YYYY-MM-DD``, e.g.::
+
+        item-sales-summary-2025-04-14-to-2025-04-20.csv
+
+    Returns ``(start_date, end_date)`` as :class:`datetime.date` objects,
+    or ``(None, None)`` if the dates cannot be extracted.
+    """
+    base = os.path.basename(csv_file)
+    m = re.search(r"(\d{4}-\d{2}-\d{2})-to-(\d{4}-\d{2}-\d{2})", base)
+    if m:
+        try:
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").date()
+            end   = datetime.strptime(m.group(2), "%Y-%m-%d").date()
+            return start, end
+        except ValueError:
+            pass
+    return None, None
+
 
 # ------------------------------------------------------------
 # STANDS
@@ -291,9 +332,33 @@ class ConcessionApp(tk.Tk):
             service = build("sheets", "v4", credentials=creds)
             sheet   = service.spreadsheets()
 
-            # Read CSV
+            # Read item-sales CSV (modifier base items are skipped automatically)
             self._log(f"Reading {os.path.basename(csv_file)}…")
             rows = take_items(csv_file)
+
+            # Read modifier CSV from the same folder, if present
+            csv_dir = os.path.dirname(csv_file)
+            modifier_csv = _find_modifier_csv(csv_dir)
+            if modifier_csv:
+                week_start, week_end = _parse_week_from_csv_name(csv_file)
+                if week_start and week_end:
+                    self._log(f"Reading modifier CSV: {os.path.basename(modifier_csv)}…")
+                    modifier_rows = take_modifiers(modifier_csv, week_start, week_end)
+                    rows.update(modifier_rows)
+                    if modifier_rows:
+                        self._log(
+                            f"Merged {len(modifier_rows)} modifier item(s): "
+                            + ", ".join(modifier_rows.keys())
+                        )
+                    else:
+                        self._log("Modifier CSV loaded but no matching data for this week.")
+                else:
+                    self._log(
+                        "Could not parse week dates from CSV filename; skipping modifiers.",
+                        "WARNING",
+                    )
+            else:
+                self._log("No modifier CSV found in folder; skipping modifier step.")
 
             # Write to sheet
             self._log("Writing formatted sheet…")
