@@ -5,7 +5,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, font as tkfont
 
-from Take_items import take_items   # your CSV ingestion function
+from Take_items import take_items, take_modifiers   # your CSV ingestion functions
 from Call_sheets import write_full_week
 from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
@@ -294,6 +294,32 @@ class ConcessionApp(tk.Tk):
             # Read CSV
             self._log(f"Reading {os.path.basename(csv_file)}…")
             rows = take_items(csv_file)
+
+            # Try to read modifier data from the same folder
+            modifier_file = csv_file.replace("item-sales", "modifier-sales")
+            if os.path.exists(modifier_file):
+                self._log(f"Reading modifier data from {os.path.basename(modifier_file)}…")
+                modifier_rows = take_modifiers(
+                    modifier_file,
+                    week_start_date=None,
+                    week_end_date=None,
+                    stand_name=stand_name,
+                )
+                # Merge modifier rows additively: if an item already exists in rows
+                # (shouldn't happen in normal flow, but log a warning just in case),
+                # accumulate the sales rather than silently overwriting.
+                for item_name, mod_data in modifier_rows.items():
+                    if item_name in rows:
+                        logging.getLogger(__name__).warning(
+                            "Modifier item %r already in sales rows — adding sales (was %d, adding %d)",
+                            item_name, rows[item_name]["sales"], mod_data["sales"],
+                        )
+                        rows[item_name]["sales"] += mod_data["sales"]
+                    else:
+                        rows[item_name] = mod_data
+                self._log(f"Merged {len(modifier_rows)} modifier items into sales data.")
+            else:
+                self._log(f"No modifier file found (expected: {os.path.basename(modifier_file)})")
 
             # Write to sheet
             self._log("Writing formatted sheet…")
