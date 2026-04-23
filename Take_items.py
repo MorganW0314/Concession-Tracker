@@ -13,6 +13,11 @@ COMBO_BREAKDOWN = {
     "Pulled Pork Combo": ["Chicken Tenders", "Fries", "Fountain Drink"],
 }
 
+MODIFIER_ITEMS = {
+    "Gatorade": ["Gatorade Blue", "Gatorade Red", "Gatorade Orange"],
+    # Add more items here as we scale beyond prototype
+}
+
 _logger = _make_logger("concession.Take_items")
 
 
@@ -89,6 +94,11 @@ def take_items(csv_file_path, stand_name=None):
                 skipped_rows += 1
                 continue
 
+            if item in MODIFIER_ITEMS:
+                _logger.debug("Skipping modifier item: %r", item)
+                skipped_rows += 1
+                continue
+
             if item in COMBO_BREAKDOWN:
                 for comp in COMBO_BREAKDOWN[item]:
                     if comp not in rows:
@@ -130,4 +140,123 @@ def take_items(csv_file_path, stand_name=None):
             item_names=list(rows.keys()),
         )
 
+    return rows
+
+
+def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stand_name=None):
+    """Parse a Square modifier CSV export and return a dict of modifier item sales.
+
+    CSV format:
+        Modifier Set,Modifier,<date-range column(s)...>
+
+    The item name is constructed by finding which MODIFIER_ITEMS key is contained
+    in the Modifier Set value (e.g. "Gatorade Flavor" contains "Gatorade"), then
+    combining that key with the Modifier value (e.g. "Gatorade" + "Blue" →
+    "Gatorade Blue").
+
+    Args:
+        csv_file_path:   Absolute path to the modifier CSV file.
+        week_start_date: Optional start date to filter columns (reserved for future use).
+        week_end_date:   Optional end date to filter columns (reserved for future use).
+        stand_name:      Optional stand name for audit logging.
+
+    Returns:
+        dict mapping item_name -> {"starting": 0, "deliveries": 0,
+                                   "sales": int, "spoilage": 0}
+        Returns an empty dict if the file is not found or parsing fails.
+    """
+    if not os.path.exists(csv_file_path):
+        _logger.warning("Modifier file not found: %s", csv_file_path)
+        return {}
+
+    rows = {}
+    _logger.info("Reading modifier CSV: %s", csv_file_path)
+
+    try:
+        with open(csv_file_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+
+            fieldnames = reader.fieldnames or []
+            # Normalize header names (same treatment as take_items)
+            fieldnames = [
+                fn.replace("\u00A0", " ")
+                  .replace("\u200B", "")
+                  .replace("\u202F", " ")
+                  .strip()
+                for fn in fieldnames
+            ]
+            reader.fieldnames = fieldnames
+
+            # Date columns are every column after "Modifier Set" and "Modifier"
+            date_columns = [
+                fn for fn in fieldnames
+                if fn not in ("Modifier Set", "Modifier")
+            ]
+
+            if not date_columns:
+                _logger.warning(
+                    "Modifier CSV has no date columns: %s", csv_file_path
+                )
+                return {}
+
+            _logger.debug("Modifier CSV date columns: %s", date_columns)
+
+            for line in reader:
+                modifier_set = (line.get("Modifier Set") or "").strip()
+                modifier = (line.get("Modifier") or "").strip()
+
+                if not modifier_set or not modifier:
+                    continue
+
+                # Find which MODIFIER_ITEMS key is contained in the modifier set name.
+                # Use the longest matching key to avoid ambiguity when one key is a
+                # substring of another (e.g. "Gatorade" vs "Gatorade Zero").
+                base_name = None
+                for key in sorted(MODIFIER_ITEMS, key=len, reverse=True):
+                    if key in modifier_set:
+                        base_name = key
+                        break
+
+                if base_name is None:
+                    _logger.debug(
+                        "Modifier set %r not matched in MODIFIER_ITEMS — skipping",
+                        modifier_set,
+                    )
+                    continue
+
+                item_name = f"{base_name} {modifier}"
+
+                # Sum quantities across all date columns
+                total_qty = 0
+                for col in date_columns:
+                    raw = (line.get(col) or "").strip()
+                    if not raw:
+                        continue
+                    # Handle dollar-prefixed values (Square sometimes exports currency
+                    # format like "$5.00") as well as plain integer/float quantities.
+                    raw = raw.lstrip("$").replace(",", "")
+                    try:
+                        total_qty += int(round(float(raw)))
+                    except ValueError:
+                        _logger.warning(
+                            "Could not parse quantity %r for %r in column %r",
+                            raw, item_name, col,
+                        )
+
+                rows[item_name] = {
+                    "starting": 0,
+                    "deliveries": 0,
+                    "sales": total_qty,
+                    "spoilage": 0,
+                }
+                _logger.debug("Modifier item: %r → sales=%d", item_name, total_qty)
+
+    except Exception as exc:
+        _logger.error("Failed to parse modifier CSV %s: %s", csv_file_path, exc)
+        return {}
+
+    _logger.info(
+        "Modifier CSV read complete: %d modifier items loaded from %s",
+        len(rows), os.path.basename(csv_file_path),
+    )
     return rows
