@@ -299,10 +299,13 @@ class ConcessionApp(tk.Tk):
             self._log("Writing formatted sheet…")
             write_full_week(sheet, service, SPREADSHEET_ID, stand_name, rows)
 
-            # Check for a matching modifier file and, if found, overwrite the
-            # Sales cells in the week block that was just created.
-            modifier_file = csv_file.replace("item-sales", "modifier-sales")
-            if os.path.exists(modifier_file):
+            # Check for a modifier file in the same folder as the item-sales CSV.
+            # Any file matching modifier-sales-*.csv in that folder is accepted;
+            # if multiple are found the most-recently modified one is used.
+            folder = os.path.dirname(os.path.abspath(csv_file))
+            modifier_candidates = glob.glob(os.path.join(folder, "modifier-sales-*.csv"))
+            if modifier_candidates:
+                modifier_file = max(modifier_candidates, key=os.path.getmtime)
                 self._log(f"Reading modifier data from {os.path.basename(modifier_file)}…")
                 modifier_rows = take_modifiers(
                     modifier_file,
@@ -316,7 +319,7 @@ class ConcessionApp(tk.Tk):
                 )
                 self._log(f"Modifier sales written for {len(modifier_rows)} items.")
             else:
-                self._log(f"No modifier file found (expected: {os.path.basename(modifier_file)})")
+                self._log("No modifier-sales-*.csv file found in same folder — skipping modifier step.")
 
             # Success
             self.after(0, self._on_success, stand_name)
