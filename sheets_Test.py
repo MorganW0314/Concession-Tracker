@@ -220,7 +220,7 @@ class ConcessionApp(tk.Tk):
     # ----------------------------------------------------------
     def _refresh_csv_list(self):
         """Re-scan ~/Downloads for CSV files and populate the combo."""
-        concession_data = os.path.join(os.path.dirname(__file__), "Concession data")
+        concession_data = os.path.join(os.path.dirname(__file__), "concession_data")
         files = sorted(glob.glob(os.path.join(concession_data, "*.csv")))
         names = [os.path.basename(f) for f in files]
         self._csv_files = files
