@@ -1,4 +1,5 @@
 import csv
+import logging
 from unittest import result
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
@@ -2105,6 +2106,68 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
           f"(columns {week_start_letter}–{week_end_letter}).")
 
 
+_modifier_logger = logging.getLogger(__name__)
+
+
+def write_modifier_sales_to_week(sheet, service, spreadsheet_id, stand_name, modifier_rows):
+    """Overwrite the Sales cells in the most-recent week block for modifier items.
+
+    Instead of creating a new week, this function finds the last week already
+    written to the stand sheet and updates only the Sales column for each item
+    found in *modifier_rows*.
+
+    Args:
+        sheet:           Google Sheets API resource (service.spreadsheets()).
+        service:         Full Google Sheets API service object.
+        spreadsheet_id:  ID of the target spreadsheet.
+        stand_name:      Name of the stand tab within the spreadsheet.
+        modifier_rows:   dict mapping item_name -> {"sales": int, ...}
+                         as returned by take_modifiers().
+    """
+    last_week_start = find_last_week_start_col(sheet, spreadsheet_id, stand_name)
+    if last_week_start == 0:
+        _modifier_logger.warning(
+            "write_modifier_sales_to_week: no weeks found in '%s' — "
+            "run item-sales first to create the week block.",
+            stand_name,
+        )
+        return
+
+    sales_col = col_letter(last_week_start + COL_SALES)
+    item_row_map = read_item_row_map(sheet, spreadsheet_id, stand_name)
+
+    batch_data = []
+    for item_name, mod_data in modifier_rows.items():
+        row_num = item_row_map.get(item_name)
+        if row_num is None:
+            _modifier_logger.warning(
+                "Modifier item %r not found in sheet '%s' — skipping.",
+                item_name,
+                stand_name,
+            )
+            continue
+        qty = mod_data.get("sales", 0)
+        batch_data.append({
+            "range": f"'{stand_name}'!{sales_col}{row_num}",
+            "values": [[qty]],
+        })
+        _modifier_logger.debug("Updated %r sales to %d", item_name, qty)
+
+    if batch_data:
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"valueInputOption": "USER_ENTERED", "data": batch_data},
+        ).execute()
+        _modifier_logger.info(
+            "Modifier sales written to column %s of '%s' (%d items).",
+            sales_col,
+            stand_name,
+            len(batch_data),
+        )
+    else:
+        _modifier_logger.warning(
+            "No modifier items were matched in sheet '%s'.", stand_name
+        )
 
 
 
