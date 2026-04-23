@@ -53,6 +53,7 @@ def take_items(csv_file_path, stand_name=None):
     raw_row_count = 0
     skipped_rows = 0
     malformed_rows = 0
+    modifier_skipped_items = []
 
     _logger.info("Reading CSV: %s", csv_path)
 
@@ -95,7 +96,12 @@ def take_items(csv_file_path, stand_name=None):
                 continue
 
             if item in MODIFIER_ITEMS:
-                _logger.debug("Skipping modifier item: %r", item)
+                qty = net_sales
+                _logger.info(
+                    "⏭️  SKIPPING MODIFIER ITEM: %r (qty=%d) — will be populated by modifier-sales CSV",
+                    item, qty
+                )
+                modifier_skipped_items.append((item, qty))
                 skipped_rows += 1
                 continue
 
@@ -130,6 +136,12 @@ def take_items(csv_file_path, stand_name=None):
         "%d skipped (blank), %d malformed",
         raw_row_count, len(rows), skipped_rows, malformed_rows,
     )
+
+    if modifier_skipped_items:
+        _logger.info(
+            "🔄 Modifier items skipped: %s — these will be populated when modifier-sales CSV runs",
+            ", ".join([f"{item}({qty})" for item, qty in modifier_skipped_items])
+        )
 
     # Audit log (only when stand_name provided)
     if stand_name:
@@ -170,7 +182,7 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
         return {}
 
     rows = {}
-    _logger.info("Reading modifier CSV: %s", csv_file_path)
+    _logger.info("🔄 Reading modifier CSV: %s", csv_file_path)
 
     try:
         with open(csv_file_path, "r", encoding="utf-8") as f:
@@ -256,7 +268,7 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
         return {}
 
     _logger.info(
-        "Modifier CSV read complete: %d modifier items loaded from %s",
+        "✅ Modifier CSV read complete: %d modifier items loaded from %s",
         len(rows), os.path.basename(csv_file_path),
     )
     return rows
