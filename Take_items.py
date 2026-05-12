@@ -5,16 +5,16 @@ import os
 from data_validation import AuditLogger, _make_logger
 
 COMBO_BREAKDOWN = {
-    "Chili Cheese Dog Combo Meal": ["Chili Cheese Dog", "Assorted Chips", "Fountain Drink"],
-    "Uncrustable Combo Meal": ["Uncrustable", "Assorted Chips", "Fountain Drink"],
-    "Chicken Salad Combo Meal": ["Chicken Salad Sandwich", "Assorted Chips", "Fountain Drink"],
-    "Hot Dog Combo Meal": ["Hot Dog", "Assorted Chips", "Fountain Drink"],
-    "Pizza Combo Meal": ["Pizza", "Assorted Chips", "Fountain Drink"],
-    "Pulled Pork Combo Meal": ["Pulled Pork Sandwich", "Assorted Chips", "Fountain Drink"],
+    "Chili Cheese Dog Combo Meal": ["Chili Cheese Dog", "Assorted Chips"],
+    "Uncrustable Combo Meal": ["Uncrustable", "Assorted Chips"],
+    "Chicken Salad Combo Meal": ["Chicken Salad Sandwich", "Assorted Chips"],
+    "Hot Dog Combo Meal": ["Hot Dog", "Assorted Chips"],
+    "Pizza Combo Meal": ["Pizza", "Assorted Chips"],
+    "Pulled Pork Combo Meal": ["Pulled Pork", "Assorted Chips"],
 }
 
 MODIFIER_ITEMS = {
-    "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow"],
+    "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow", "Gatorade - Orange"],
     # Add more items here as we scale beyond prototype
 }
 

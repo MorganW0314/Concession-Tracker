@@ -1175,7 +1175,6 @@ SCOOP_VARIANT_TO_BASE: dict[str, str] = {
     # Rainbow Sherbert
     "Rainbow Sherbert":                   "Rainbow Sherbert",
     "Rainbow Sherbert Single Scoop":      "Rainbow Sherbert",
-    # Rainbow Sherbert
     "Rainbow Sherbert Double Scoop":      "Rainbow Sherbert",
     "Rainbow Sherbert Triple Scoop":      "Rainbow Sherbert",
     # PB S'Mores
@@ -1322,7 +1321,7 @@ TOFTS_ICE_CREAM = [
 NOVELTIES = [
     "Bomb Pop",
     "Cookie Sandwich",
-    "Nerd's Bomb Pop",
+    "Nerds Bomb Pop",
     "PowderPuff Girl",
     "Reese's Sandwiches",
     "Snickers",
@@ -1341,7 +1340,7 @@ CANDY = [
     "Slime Lickers",
     "Xtremes",
     "Starburst",
-    "Nerd's Cluster",
+    "Nerds Clusters",
     "Cotton Candy",
 ]
 
@@ -1366,6 +1365,7 @@ BOTTLED_DRINKS = [
     "Gatorade - Red",
     "Gatorade - Blue",
     "Gatorade - Yellow",
+    "Gatorade - Orange",
     "Bloom Pop - Strawberry Cream",
     "Bloom Pop - Raspberry Lemonade",
     "Bloom Pop - Watermelon Lime",
