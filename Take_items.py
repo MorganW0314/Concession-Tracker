@@ -9,12 +9,12 @@ COMBO_BREAKDOWN = {
     "Uncrustable Combo Meal": ["Uncrustable", "Assorted Chips", "Fountain Drink"],
     "Chicken Salad Combo Meal": ["Chicken Salad Sandwich", "Assorted Chips", "Fountain Drink"],
     "Hot Dog Combo Meal": ["Hot Dog", "Assorted Chips", "Fountain Drink"],
-    "pizza Combo Meal": ["Pizza slice", "Assorted Chips", "Fountain Drink"],
-    "Pulled Pork Combo": ["Chicken Tenders", "Fries", "Fountain Drink"],
+    "Pizza Combo Meal": ["Pizza", "Assorted Chips", "Fountain Drink"],
+    "Pulled Pork Combo Meal": ["Pulled Pork Sandwich", "Assorted Chips", "Fountain Drink"],
 }
 
 MODIFIER_ITEMS = {
-    "Gatorade": ["Gatorade Blue", "Gatorade Red", "Gatorade Orange"],
+    "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow"],
     # Add more items here as we scale beyond prototype
 }
 

@@ -7,6 +7,7 @@ from tkinter import ttk, font as tkfont
 
 from Take_items import take_items, take_modifiers   # your CSV ingestion functions
 from Call_sheets import write_full_week, write_modifier_sales_to_week
+from email_summary import send_summary_email
 from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
 
@@ -16,6 +17,13 @@ from google.oauth2.service_account import Credentials
 SPREADSHEET_ID = "13MhJ9cykz_l89PvV2KrVHHL2-TEos6JWt43dMMYFR1U"
 
 CREDENTIALS_PATH = r"C:\Users\willi\OneDrive\Desktop\inventory_Script\Credentials-personal.json"
+
+EMAIL_SMTP_HOST = os.getenv("CONCESSION_SMTP_HOST", "")
+EMAIL_SMTP_PORT = int(os.getenv("CONCESSION_SMTP_PORT", "587"))
+EMAIL_SMTP_USERNAME = os.getenv("CONCESSION_SMTP_USERNAME", "")
+EMAIL_SMTP_PASSWORD = os.getenv("CONCESSION_SMTP_PASSWORD", "")
+EMAIL_SENDER = os.getenv("CONCESSION_EMAIL_SENDER", "")
+EMAIL_RECIPIENT = os.getenv("CONCESSION_EMAIL_RECIPIENT", "")
 
 # ------------------------------------------------------------
 # STANDS
@@ -321,6 +329,22 @@ class ConcessionApp(tk.Tk):
             else:
                 self._log("No modifier-sales-*.csv file found in same folder — skipping modifier step.")
 
+            email_sent = send_summary_email(
+                sheet=sheet,
+                spreadsheet_id=SPREADSHEET_ID,
+                stand_names=STANDS,
+                smtp_host=EMAIL_SMTP_HOST,
+                smtp_port=EMAIL_SMTP_PORT,
+                smtp_username=EMAIL_SMTP_USERNAME,
+                smtp_password=EMAIL_SMTP_PASSWORD,
+                sender=EMAIL_SENDER,
+                recipient=EMAIL_RECIPIENT,
+            )
+            if email_sent:
+                self._log("Weekly inventory summary email sent.")
+            else:
+                self._log("Weekly summary email skipped (SMTP/email config not provided).")
+
             # Success
             self.after(0, self._on_success, stand_name)
 
@@ -348,4 +372,3 @@ class ConcessionApp(tk.Tk):
 if __name__ == "__main__":
     app = ConcessionApp()
     app.mainloop()
-

@@ -1089,18 +1089,19 @@ def ensure_tab_exists(service, SPREADSHEET_ID, range_string, values, tab_name):
 # category has a separate "Cotton Candy" item and sharing the key would cause
 # row-map collisions in the sheet.
 _TOFTS_BASE_FLAVORS = [
-    "Vanilla",
-    "Mint Chip",
+    "Brownie Bandit",
+    "Birthday Cake",
     "Chocolate",
     "Cookie Dough",
-    "Cookies & Cream",
-    "Cotton Candy Ice Cream",
     "Cookie Monster",
-    "Peanut Butter Cup",
-    "Strawberry Cheesecake",
-    "Super Duper Scoop",
+    "Cookies n' Cream",
+    "Vanilla",
+    # Kept distinct from candy row name to avoid duplicate row-key collisions.
+    "Cotton Candy Ice Cream",
+    "Mint Chip",
     "Rainbow Sherbert",
-    "Brownie Bandit",
+    "PB S'Mores",
+    "Blueberry Waffle Cone",
 ]
 
 # Comprehensive mapping of every CSV scoop-variant name → canonical base flavor.
@@ -1120,34 +1121,78 @@ _TOFTS_BASE_FLAVORS = [
 #      so the sheet's Sales column is populated correctly.
 SCOOP_VARIANT_TO_BASE: dict[str, str] = {
     # Brownie Bandit
+    "Brownie Bandit":                     "Brownie Bandit",
     "Brownie Bandit Single Scoop":        "Brownie Bandit",
     "Brownie Bandit Double Scoop":        "Brownie Bandit",
+    "Brownie Bandit Triple Scoop":        "Brownie Bandit",
+    # Birthday Cake
+    "Birthday Cake":                      "Birthday Cake",
+    "Birthday Cake Single Scoop":         "Birthday Cake",
+    "Birthday Cake Double Scoop":         "Birthday Cake",
+    "Birthday Cake Triple Scoop":         "Birthday Cake",
     # Chocolate
+    "Chocolate":                          "Chocolate",
     "Chocolate Single Scoop":             "Chocolate",
     "Chocolate Double Scoop":             "Chocolate",
+    "Chocolate Triple Scoop":             "Chocolate",
     # Cookie Dough
+    "Cookie Dough":                       "Cookie Dough",
+    "Cookie Dough Single Scoop":          "Cookie Dough",
     "Cookie Dough Double Scoop":          "Cookie Dough",
+    "Cookie Dough Triple Scoop":          "Cookie Dough",
     # Cookie Monster
+    "Cookie Monster":                     "Cookie Monster",
+    "Cookie Monster Single Scoop":        "Cookie Monster",
     "Cookie Monster Double Scoop":        "Cookie Monster",
-    # Cookies & Cream
-    "Cookies & Cream Double Scoop":       "Cookies & Cream",
+    "Cookie Monster Triple Scoop":        "Cookie Monster",
+    # Cookies n' Cream (include common CSV spelling variants)
+    "Cookies n' Cream":                   "Cookies n' Cream",
+    "Cookies n' Cream Single Scoop":      "Cookies n' Cream",
+    "Cookies n' Cream Double Scoop":      "Cookies n' Cream",
+    "Cookies n' Cream Triple Scoop":      "Cookies n' Cream",
+    "Cookies N Cream":                    "Cookies n' Cream",
+    "Cookies N Cream Single Scoop":       "Cookies n' Cream",
+    "Cookies N Cream Double Scoop":       "Cookies n' Cream",
+    "Cookies N Cream Triple Scoop":       "Cookies n' Cream",
+    "Cookies & Cream":                    "Cookies n' Cream",
+    "Cookies & Cream Single Scoop":       "Cookies n' Cream",
+    "Cookies & Cream Double Scoop":       "Cookies n' Cream",
+    "Cookies & Cream Triple Scoop":       "Cookies n' Cream",
     # Cotton Candy (base name differs: "Cotton Candy Ice Cream")
+    "Cotton Candy Ice Cream":             "Cotton Candy Ice Cream",
+    "Cotton Candy Single Scoop":          "Cotton Candy Ice Cream",
     "Cotton Candy Double Scoop":          "Cotton Candy Ice Cream",
+    "Cotton Candy Triple Scoop":          "Cotton Candy Ice Cream",
+    "Cotton Candy Ice Cream Single Scoop":"Cotton Candy Ice Cream",
+    "Cotton Candy Ice Cream Double Scoop":"Cotton Candy Ice Cream",
+    "Cotton Candy Ice Cream Triple Scoop":"Cotton Candy Ice Cream",
     # Mint Chip (variant names differ from base)
+    "Mint Chip":                          "Mint Chip",
+    "Mint Chip Single Scoop":             "Mint Chip",
     "Mint Chip Double":                   "Mint Chip",
     "Mint Chip Double Scoop":             "Mint Chip",
-    # Peanut Butter Cup
-    "Peanut Butter Cup Double Scoop":     "Peanut Butter Cup",
+    "Mint Chip Triple Scoop":             "Mint Chip",
+    # Rainbow Sherbert
+    "Rainbow Sherbert":                   "Rainbow Sherbert",
+    "Rainbow Sherbert Single Scoop":      "Rainbow Sherbert",
     # Rainbow Sherbert
     "Rainbow Sherbert Double Scoop":      "Rainbow Sherbert",
-    # Strawberry Cheesecake
-    "Strawberry Cheesecake Single Scoop": "Strawberry Cheesecake",
-    "Strawberry Cheesecake Double Scoop": "Strawberry Cheesecake",
-    # Super Duper Scoop (variant names differ from base)
-    "Super Duper Scoop Double":           "Super Duper Scoop",
-    "Super Duper Scoop Double Scoop":     "Super Duper Scoop",
+    "Rainbow Sherbert Triple Scoop":      "Rainbow Sherbert",
+    # PB S'Mores
+    "PB S'Mores":                         "PB S'Mores",
+    "PB S'Mores Single Scoop":            "PB S'Mores",
+    "PB S'Mores Double Scoop":            "PB S'Mores",
+    "PB S'Mores Triple Scoop":            "PB S'Mores",
+    # Blueberry Waffle Cone
+    "Blueberry Waffle Cone":              "Blueberry Waffle Cone",
+    "Blueberry Waffle Cone Single Scoop": "Blueberry Waffle Cone",
+    "Blueberry Waffle Cone Double Scoop": "Blueberry Waffle Cone",
+    "Blueberry Waffle Cone Triple Scoop": "Blueberry Waffle Cone",
     # Vanilla
+    "Vanilla":                            "Vanilla",
+    "Vanilla Single Scoop":               "Vanilla",
     "Vanilla Double Scoop":               "Vanilla",
+    "Vanilla Triple Scoop":               "Vanilla",
 }
 
 
@@ -1220,129 +1265,167 @@ def consolidate_variants_to_base(
 # is_tofts checks).  The sheet display uses _TOFTS_BASE_FLAVORS (the 12 bases)
 # so that scoop-variant rows do NOT appear as separate lines on the sheet.
 TOFTS_ICE_CREAM = [
-    # --- Base flavors ---
-    "Vanilla",
-    "Mint Chip",
-    "Chocolate",
-    "Cookie Dough",
-    "Cookies & Cream",
-    "Cotton Candy Ice Cream",
-    "Cookie Monster",
-    "Peanut Butter Cup",
-    "Strawberry Cheesecake",
-    "Super Duper Scoop",
-    "Rainbow Sherbert",
-    "Brownie Bandit",
-    # --- Scoop variants (Single / Double) ---
+    # Base flavors
+    *_TOFTS_BASE_FLAVORS,
+    # Variant aliases
     "Brownie Bandit Single Scoop",
     "Brownie Bandit Double Scoop",
+    "Brownie Bandit Triple Scoop",
+    "Birthday Cake Single Scoop",
+    "Birthday Cake Double Scoop",
+    "Birthday Cake Triple Scoop",
     "Chocolate Single Scoop",
     "Chocolate Double Scoop",
+    "Chocolate Triple Scoop",
+    "Cookie Dough Single Scoop",
     "Cookie Dough Double Scoop",
+    "Cookie Dough Triple Scoop",
+    "Cookie Monster Single Scoop",
     "Cookie Monster Double Scoop",
+    "Cookie Monster Triple Scoop",
+    "Cookies n' Cream Single Scoop",
+    "Cookies n' Cream Double Scoop",
+    "Cookies n' Cream Triple Scoop",
+    "Cookies N Cream",
+    "Cookies N Cream Single Scoop",
+    "Cookies N Cream Double Scoop",
+    "Cookies N Cream Triple Scoop",
+    "Cookies & Cream",
+    "Cookies & Cream Single Scoop",
     "Cookies & Cream Double Scoop",
+    "Cookies & Cream Triple Scoop",
+    "Cotton Candy Single Scoop",
     "Cotton Candy Double Scoop",
+    "Cotton Candy Triple Scoop",
+    "Cotton Candy Ice Cream Single Scoop",
+    "Cotton Candy Ice Cream Double Scoop",
+    "Cotton Candy Ice Cream Triple Scoop",
+    "Mint Chip Single Scoop",
     "Mint Chip Double",
     "Mint Chip Double Scoop",
-    "Peanut Butter Cup Double Scoop",
+    "Mint Chip Triple Scoop",
+    "Rainbow Sherbert Single Scoop",
     "Rainbow Sherbert Double Scoop",
-    "Strawberry Cheesecake Single Scoop",
-    "Strawberry Cheesecake Double Scoop",
-    "Super Duper Scoop Double",
-    "Super Duper Scoop Double Scoop",
+    "Rainbow Sherbert Triple Scoop",
+    "PB S'Mores Single Scoop",
+    "PB S'Mores Double Scoop",
+    "PB S'Mores Triple Scoop",
+    "Blueberry Waffle Cone Single Scoop",
+    "Blueberry Waffle Cone Double Scoop",
+    "Blueberry Waffle Cone Triple Scoop",
+    "Vanilla Single Scoop",
     "Vanilla Double Scoop",
+    "Vanilla Triple Scoop",
 ]
 
 
-NOVELTY_ICE_CREAM = [
-        "Bomb Pop",
-        "Cannonball!!!",
-        "Cookie Sandwich",
-        "Hawaiian Shaved Ice Ball",
-        "Nerd Bomb Pop",
-        "Ninja Turtles Ice Cream",
-        "Rainbow Sherbet Float",
-        "Root Beer Float",
-        "Snickers Ice Cream Bar",
-        "Sonic The Hedgehog",
-        "Spiderman Ice Cream",
-        "Spongebob Ice Cream",
-        "Strawberry Shortcake Bar",
-        "Twix Ice Cream Bar"
-    ]
+NOVELTIES = [
+    "Bomb Pop",
+    "Cookie Sandwich",
+    "Nerd's Bomb Pop",
+    "PowderPuff Girl",
+    "Reese's Sandwiches",
+    "Snickers",
+    "Sonic",
+    "Spiderman",
+    "Spongebob",
+    "Strawberry Shortcake",
+    "Sundae Cone",
+    "Twix",
+]
 
 CANDY = [
-        "Airheads 2 for $1",
-        "Cotton Candy",
-        "Cow Tail",
-        "Nerds Clusters",
-        "Ring Pop",
-        "Slime Lickers",
-        "Sour Patch Kids",
-        "Starburst",
-        "Swedish Fish",
-        "Xtremes"
-    ]
-
-DRINKS = [
-        "Bottled Water",
-        "Coca-Cola",
-        "Dr. Pepper",
-        "Gatorade Blue",
-        "Gatorade Orange",
-        "Gatorade Red",
-        "Gatorade White",
-        "Ice + Water",
-        "Razzberry Tea",
-        "Root Beer",
-        "Souvenir Cup",
-        "Soda Refill $1"
-    ]
-
-MEALS = [
-        "BBQ Pork Sandwich",
-        "Chicken Salad Sandwich",
-        "Chili Cheese Dog",
-        "Chili Cheese Nachos",
-        "Hot Dog",
-        "Pizza Slice",
-        "Pulled Pork Nachos",
-        "Pulled Pork Sandwich",
-        "Uncrustable",
-        "Walking Taco",
-        "Cup of Cheese",
-        "Whole Jet's Pizza"
-    ]
-
-SNACKS = [
-        "Assorted Chips",
-        "Frozen Grapes",
-        "Hummus and Pita Chips",
-        "Smoothies",
-        "String Cheese",
-        "Jumbo Pickle",
-        "Nachos & Cheese",
-        "Soft Pretzel"
-    ]
-
-    # Manual category (not in CSV)
-SYRUPS = [
-    "Blue Raspberry Syrup (decimal estimate)",
-    "Cherry Syrup (decimal estimate)",
-    "Grape Syrup (decimal estimate)",
-    "Orange Syrup (decimal estimate)",
-    "Root Beer Syrup (decimal estimate)",
-    "Cotton Candy Syrup (decimal estimate)"
+    "Airheads",
+    "Sourpatch Kids",
+    "Ring Pop",
+    "Slime Lickers",
+    "Xtremes",
+    "Starburst",
+    "Nerd's Cluster",
+    "Cotton Candy",
 ]
 
-BIB_SYRUPS = [
-    "Dr. Pepper (decimal estimate)",
-    "Rootbeer (decimal estimate)",
-    "Pepsi (decimal estimate)",
-    "Diet Pepsi (decimal estimate)",
-    "Mt Dew (decimal estimate)",
-    "Starry (decimal estimate)",
-    "Slushi Mix (count in bag; 10 per box)"
+FOUNTAIN_DRINKS = [
+    "7up",
+    "Sunkist",
+    "Diet RC",
+    "Dr. Pepper",
+    "Lemonade",
+    "Root Beer",
+    "RC Cola",
+    "Coca Cola",
+    "Diet Coke",
+    "Diet Pepsi",
+    "Mt. Dew",
+    "Pepsi",
+    "Starry",
+]
+
+BOTTLED_DRINKS = [
+    "Bottled Water",
+    "Gatorade - Red",
+    "Gatorade - Blue",
+    "Gatorade - Yellow",
+    "Bloom Pop - Strawberry Cream",
+    "Bloom Pop - Raspberry Lemonade",
+    "Bloom Pop - Watermelon Lime",
+    "Fairlife Protein",
+    "La Colombe - Vanilla",
+    "La Colombe - Mocha",
+    "La Colombe - Caramel",
+]
+
+SLUSHIE_MIX = [
+    "Slushie Mix",
+]
+
+FOOD = [
+    "Pizza",
+    "Chicken Salad",
+    "Hot Dog",
+    "Chili Sauce",
+    "Pulled Pork",
+    "Uncrustable",
+    "Nacho Chips",
+    "Nacho Cheese",
+    "Hamburger Buns",
+    "Hot Dog Buns",
+    "Soft Pretzel",
+    "Salad",
+    "Ham",
+    "Cheese",
+]
+
+SNACKS = [
+    "Hummus",
+    "Pita Chips",
+    "Assorted Chips",
+    "Goldfish",
+    "Crunchy Ra-Ra Yogurt",
+    "String Cheese",
+    "Frozen Grapes",
+    "Pickles",
+    "Go-Go Squeez",
+    "Oranges",
+]
+
+DISPOSABLES = [
+    "Steam Pan Liners",
+    "Nacho Trays",
+    "Pretzel Sleeves",
+    "Sandwich Trays",
+    "Napkins",
+    "Spoons",
+    "Forks",
+    "Knives",
+    "Paper Cups",
+    "Souvenir Cups",
+    "Frazil Cups",
+    "Frazil Straws",
+    "Ice Cream Cones",
+    "Ketchup",
+    "Mustard",
+    "CO2 Tanks",
 ]
 
 
@@ -1351,19 +1434,14 @@ BIB_SYRUPS = [
 
 
 JANITORIAL = [
-        "Paper Towels (count rolls)",
-        "Trash Bags (count rolls)",
-        "Gloves (estimate)",
-        "Soap (estimate)",
-        "Sanitizer (estimate)",
-        "Napkins (estimate)",
-        "Cups (estimate)",
-        "CO2 Tanks (eye track)",
-        "Syrup Bags (eye track)"
-    
-    ]
-
-SNOW_CONE_AND_FOUNTAIN_SYRUPS = SYRUPS + BIB_SYRUPS
+    "Dish Soap",
+    "Floor Cleaner",
+    "Sanitizer Tablets",
+    "Gloves",
+    "Hand Soap",
+    "Paper Towels",
+    "Trash Bags",
+]
 
 # ---------------------------------------------------------------------------
 # Ingredient / component items
@@ -1372,9 +1450,21 @@ SNOW_CONE_AND_FOUNTAIN_SYRUPS = SYRUPS + BIB_SYRUPS
 # calculate_ingredients_per_stand().
 # ---------------------------------------------------------------------------
 INGREDIENTS = [
-    "Bun",
-    "Chili (1oz scoop)",
-    "Pulled Pork (1oz scoop)",
+    "Hamburger Buns",
+    "Hot Dog Buns",
+    "Chicken Salad",
+    "Pulled Pork",
+    "Chili Sauce",
+    "Ham",
+    "Cheese",
+    "Nacho Chips",
+    "Nacho Cheese",
+    "Nacho Trays",
+    "Hummus",
+    "Pita Chips",
+    "Frazil Cups",
+    "Frazil Straws",
+    "Slushie Mix",
 ]
 
 # ---------------------------------------------------------------------------
@@ -1389,58 +1479,56 @@ INGREDIENTS = [
 # UNIT_CONVERSION and do NOT need entries here.
 # ---------------------------------------------------------------------------
 INGREDIENT_MAP = {
-    # Hot Dog: frank is tracked under "Hot Dog"; also consume 1 bun.
-    "Hot Dog": [("Bun", 1)],
+    # Sandwiches and proteins
+    "Chicken Salad Sandwich": [("Hamburger Buns", 1), ("Chicken Salad", 1)],
+    "Pulled Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork", 1)],
+    "BBQ Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork", 1)],
+    "Ham and Cheese Sandwich": [("Hamburger Buns", 1), ("Ham", 1), ("Cheese", 1)],
 
-    # Chili Cheese Dog: dog is tracked under "Chili Cheese Dog";
-    # also consume 1 bun + 1 oz-ladle scoop of chili.
-    "Chili Cheese Dog": [("Bun", 1), ("Chili (1oz scoop)", 1)],
+    # Hot dogs / chili use
+    "Hot Dog": [("Hot Dog Buns", 1)],
+    "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Chili Sauce", 1)],
 
-    # Walking Taco: 1 bag of Assorted Chips + 2 oz-ladle scoops of chili.
-    "Walking Taco": [("Assorted Chips", 1), ("Chili (1oz scoop)", 2)],
+    # Nacho items
+    "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Nacho Trays", 1)],
+    "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Nacho Trays", 1), ("Chili Sauce", 3)],
+    "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Nacho Trays", 1), ("Pulled Pork", 1)],
+    "Walking Taco": [("Assorted Chips", 1), ("Chili Sauce", 2)],
 
-    # Chili Cheese Nachos: 3 oz-ladle scoops of chili.
-    "Chili Cheese Nachos": [("Chili (1oz scoop)", 3)],
-
-    # Pulled Pork Nachos: 3 oz-ladle scoops of pulled pork.
-    "Pulled Pork Nachos": [("Pulled Pork (1oz scoop)", 3)],
-
-    # Pulled Pork Sandwich: sandwich is tracked; also 1 bun + 1 scoop pulled pork.
-    "Pulled Pork Sandwich": [("Bun", 1), ("Pulled Pork (1oz scoop)", 1)],
-
-    # BBQ Pork Sandwich: same as Pulled Pork Sandwich (alternative CSV name).
-    "BBQ Pork Sandwich": [("Bun", 1), ("Pulled Pork (1oz scoop)", 1)],
+    # Snacks and frozen drinks
+    "Hummus and Pita Chips": [("Hummus", 1), ("Pita Chips", 1)],
+    "Slushie": [("Slushie Mix", 1), ("Frazil Cups", 1), ("Frazil Straws", 1)],
 }
 
 # ---------------------------------------------------------------------------
 # Default category order (used when no stand-specific Master Items tab exists)
 # ---------------------------------------------------------------------------
 DEFAULT_CATEGORY_ORDER = [
-    # Only the 12 base flavors appear on the sheet; scoop variants (Single/Double)
-    # are recognised via TOFTS_ICE_CREAM for CSV matching but are NOT given their
-    # own rows — their scoops are consolidated into the base-flavor rows.
-    ("ICE CREAM (Toft's Scoops)", _TOFTS_BASE_FLAVORS),
-    ("NOVELTY ICE CREAM", NOVELTY_ICE_CREAM),
     ("CANDY", CANDY),
-    ("DRINKS", DRINKS),
-    ("MEALS", MEALS),
+    ("NOVELTIES", NOVELTIES),
+    ("ICE_CREAM_TOFTS", _TOFTS_BASE_FLAVORS),
+    ("FOUNTAIN_DRINKS", FOUNTAIN_DRINKS),
+    ("BOTTLED_DRINKS", BOTTLED_DRINKS),
+    ("SLUSHIE_MIX", SLUSHIE_MIX),
+    ("FOOD", FOOD),
     ("SNACKS", SNACKS),
-    ("INGREDIENTS / COMPONENTS", INGREDIENTS),
-    ("SNOW CONES / SYRUPS", SNOW_CONE_AND_FOUNTAIN_SYRUPS),
-    ("JANITORIAL / CONSUMABLES", JANITORIAL),
+    ("DISPOSABLES", DISPOSABLES),
+    ("JANITORIAL", JANITORIAL),
 ]
 
 # Combine all category lists (for reference / legacy use)
 all_categories = {
     "TOFTS_ICE_CREAM": TOFTS_ICE_CREAM,
-    "NOVELTY_ICE_CREAM": NOVELTY_ICE_CREAM,
     "CANDY": CANDY,
-    "DRINKS": DRINKS,
-    "MEALS": MEALS,
+    "NOVELTIES": NOVELTIES,
+    "ICE_CREAM_TOFTS": _TOFTS_BASE_FLAVORS,
+    "FOUNTAIN_DRINKS": FOUNTAIN_DRINKS,
+    "BOTTLED_DRINKS": BOTTLED_DRINKS,
+    "SLUSHIE_MIX": SLUSHIE_MIX,
+    "FOOD": FOOD,
     "SNACKS": SNACKS,
-    "INGREDIENTS": INGREDIENTS,
+    "DISPOSABLES": DISPOSABLES,
     "JANITORIAL": JANITORIAL,
-    "SNOW_CONE_AND_FOUNTAIN_SYRUPS": SNOW_CONE_AND_FOUNTAIN_SYRUPS
 }
 
 def read_last_week_inventory(service, spreadsheet_id, previous_sheet_name):
@@ -2179,4 +2267,3 @@ def connect_to_sheets():
     )
     service = build("sheets", "v4", credentials=creds)
     return service
-
