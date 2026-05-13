@@ -32,6 +32,23 @@ COLS_PER_WEEK = 12
 # to scoops when the Deliveries tab includes a TYPE column.
 SCOOPS_PER_TUB = 60
 
+# Fountain syrup conversion constants.
+# 1 "package" on Deliveries-{stand} is converted to ounces automatically:
+#   PTAC uses 640oz bags; all other known stands in this map use 320oz bags.
+SYRUP_BAG_SIZES = {
+    "PTAC": 640,
+    "Reed Road": 320,
+    "Treemont": 320,
+    "Devon": 320,
+    "NWSC": 320,
+    "Hilliard East": 320,
+    "Hilliard West": 320,
+    "Bexley": 320,
+}
+
+# Industry-standard 1:5 syrup:water ratio for a 16oz fountain drink.
+SYRUP_PER_16OZ_DRINK = 2.67
+
 # Sub-header labels written in row 2 for every week block.
 WEEK_COL_HEADERS = [
     "Starting", "Deliveries", "Sales", "Spoilage",
@@ -333,35 +350,39 @@ UNIT_CONVERSION = {
     "Cookie Monster Double Scoop": 2,
     "Cookie Monster Triple Scoop": 3,
 
+    # Brownie Bandit
+    "Brownie Bandit": 1,
+    "Brownie Bandit Double Scoop": 2,
+    "Brownie Bandit Triple Scoop": 3,
+
+    # Birthday Cake
+    "Birthday Cake": 1,
+    "Birthday Cake Double Scoop": 2,
+    "Birthday Cake Triple Scoop": 3,
+
     # Mint Chip
     "Mint Chip": 1,
     "Mint Chip Double Scoop": 2,
     "Mint Chip Triple Scoop": 3,
 
-    # Peanut Butter Cup
-    "Peanut Butter Cup": 1,
-    "Peanut Butter Cup Double Scoop": 2,
-    "Peanut Butter Cup Triple Scoop": 3,
-
-    # Strawberry Cheesecake
-    "Strawberry Cheesecake": 1,
-    "Strawberry Cheesecake Double Scoop": 2,
-    "Strawberry Cheesecake Triple Scoop": 3,
-
-    # Super Duper Scoop
-    "Super Duper Scoop": 1,
-    "Super Duper Scoop Double Scoop": 2,
-    "Super Duper Scoop Triple Scoop": 3,
-
-    # Rainbow Sherbert
+    # Rainbow Sherbet
+    "Rainbow Sherbet": 1,
+    "Rainbow Sherbet Double Scoop": 2,
+    "Rainbow Sherbet Triple Scoop": 3,
+    # Backward-compatible CSV spelling
     "Rainbow Sherbert": 1,
     "Rainbow Sherbert Double Scoop": 2,
     "Rainbow Sherbert Triple Scoop": 3,
 
-    # Brownie Bandit
-    "Brownie Bandit": 1,
-    "Brownie Bandit Double Scoop": 2,
-    "Brownie Bandit Triple Scoop": 3,
+    # PB S'Mores
+    "PB S'Mores": 1,
+    "PB S'Mores Double Scoop": 2,
+    "PB S'Mores Triple Scoop": 3,
+
+    # Blueberry Waffle Cone
+    "Blueberry Waffle Cone": 1,
+    "Blueberry Waffle Cone Double Scoop": 2,
+    "Blueberry Waffle Cone Triple Scoop": 3,
 
     # Airheads (non-ice cream)
     "Airheads 2 for $1": 2,
@@ -486,6 +507,10 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
     For Toft's ice cream items (auto-detected from TOFTS_ICE_CREAM):
       qty = packages × SCOOPS_PER_TUB  (already converted to scoops)
 
+    For fountain drink items:
+      qty = packages × stand-specific bag size in ounces
+      (SYRUP_BAG_SIZES, defaults to 320oz if stand is not in the map)
+
     For all other items:
       qty = packages × units_per  (already in units)
 
@@ -569,11 +594,23 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
             for tofts_item in TOFTS_ICE_CREAM
         )
 
+        is_fountain_drink = any(
+            item.lower() == fountain_item.lower()
+            for fountain_item in FOUNTAIN_DRINKS
+        )
+
         if is_tofts_ice_cream:
             qty = packages * SCOOPS_PER_TUB
             print(
                 f"  [Deliveries] '{item}': {packages} tub(s) → "
                 f"{qty} scoops"
+            )
+        elif is_fountain_drink:
+            bag_size_oz = SYRUP_BAG_SIZES.get(stand_name, 320)
+            qty = packages * bag_size_oz
+            print(
+                f"  [Deliveries] '{item}': {packages} bag(s) at "
+                f"{stand_name} → {qty} oz syrup"
             )
         else:
             qty = packages * units_per
@@ -1099,7 +1136,7 @@ _TOFTS_BASE_FLAVORS = [
     # Kept distinct from candy row name to avoid duplicate row-key collisions.
     "Cotton Candy Ice Cream",
     "Mint Chip",
-    "Rainbow Sherbert",
+    "Rainbow Sherbet",
     "PB S'Mores",
     "Blueberry Waffle Cone",
 ]
@@ -1172,11 +1209,16 @@ SCOOP_VARIANT_TO_BASE: dict[str, str] = {
     "Mint Chip Double":                   "Mint Chip",
     "Mint Chip Double Scoop":             "Mint Chip",
     "Mint Chip Triple Scoop":             "Mint Chip",
-    # Rainbow Sherbert
-    "Rainbow Sherbert":                   "Rainbow Sherbert",
-    "Rainbow Sherbert Single Scoop":      "Rainbow Sherbert",
-    "Rainbow Sherbert Double Scoop":      "Rainbow Sherbert",
-    "Rainbow Sherbert Triple Scoop":      "Rainbow Sherbert",
+    # Rainbow Sherbet
+    "Rainbow Sherbet":                    "Rainbow Sherbet",
+    "Rainbow Sherbet Single Scoop":       "Rainbow Sherbet",
+    "Rainbow Sherbet Double Scoop":       "Rainbow Sherbet",
+    "Rainbow Sherbet Triple Scoop":       "Rainbow Sherbet",
+    # Backward-compatible CSV spelling
+    "Rainbow Sherbert":                   "Rainbow Sherbet",
+    "Rainbow Sherbert Single Scoop":      "Rainbow Sherbet",
+    "Rainbow Sherbert Double Scoop":      "Rainbow Sherbet",
+    "Rainbow Sherbert Triple Scoop":      "Rainbow Sherbet",
     # PB S'Mores
     "PB S'Mores":                         "PB S'Mores",
     "PB S'Mores Single Scoop":            "PB S'Mores",
@@ -1303,6 +1345,12 @@ TOFTS_ICE_CREAM = [
     "Mint Chip Double",
     "Mint Chip Double Scoop",
     "Mint Chip Triple Scoop",
+    "Rainbow Sherbet",
+    "Rainbow Sherbet Single Scoop",
+    "Rainbow Sherbet Double Scoop",
+    "Rainbow Sherbet Triple Scoop",
+    # Backward-compatible CSV spelling
+    "Rainbow Sherbert",
     "Rainbow Sherbert Single Scoop",
     "Rainbow Sherbert Double Scoop",
     "Rainbow Sherbert Triple Scoop",
@@ -1421,7 +1469,6 @@ DISPOSABLES = [
     "Paper Cups",
     "Souvenir Cups",
     "Frazil Cups",
-    "Frazil Straws",
     "Ice Cream Cones",
     "Ketchup",
     "Mustard",
@@ -1459,11 +1506,9 @@ INGREDIENTS = [
     "Cheese",
     "Nacho Chips",
     "Nacho Cheese",
-    "Nacho Trays",
     "Hummus",
     "Pita Chips",
     "Frazil Cups",
-    "Frazil Straws",
     "Slushie Mix",
 ]
 
@@ -1490,15 +1535,60 @@ INGREDIENT_MAP = {
     "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Chili Sauce", 1)],
 
     # Nacho items
-    "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Nacho Trays", 1)],
-    "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Nacho Trays", 1), ("Chili Sauce", 3)],
-    "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Nacho Trays", 1), ("Pulled Pork", 1)],
+    "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 1)],
+    "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Chili Sauce", 3)],
+    "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork", 1)],
     "Walking Taco": [("Assorted Chips", 1), ("Chili Sauce", 2)],
 
     # Snacks and frozen drinks
     "Hummus and Pita Chips": [("Hummus", 1), ("Pita Chips", 1)],
-    "Slushie": [("Slushie Mix", 1), ("Frazil Cups", 1), ("Frazil Straws", 1)],
+    "Slushie": [("Slushie Mix", 1), ("Frazil Cups", 1)],
 }
+
+PREMIUM_ICE_CREAM_ITEMS = {
+    "Mint Chip",
+    "Rainbow Sherbet",
+    "PB S'Mores",
+    "Blueberry Waffle Cone",
+}
+
+PREMIUM_ICE_CREAM_STANDS = {"PTAC", "NWSC", "Treemont", "Hilliard West"}
+
+LOCATION_SPECIFIC_ITEM_STANDS = {
+    "Coca Cola": {"Reed Road", "Treemont", "Devon"},
+    "Diet Coke": {"Reed Road", "Treemont", "Devon"},
+    "Diet Coke - UA ONLY": {"Reed Road", "Treemont", "Devon"},
+    "Diet Pepsi": {"PTAC"},
+    "Mt. Dew": {"PTAC"},
+    "Pepsi": {"PTAC"},
+    "Starry": {"PTAC"},
+}
+
+
+def _is_item_available_at_stand(item_name, stand_name):
+    if not stand_name:
+        return True
+
+    if item_name in PREMIUM_ICE_CREAM_ITEMS:
+        return stand_name in PREMIUM_ICE_CREAM_STANDS
+
+    allowed_stands = LOCATION_SPECIFIC_ITEM_STANDS.get(item_name)
+    if allowed_stands is not None:
+        return stand_name in allowed_stands
+
+    return True
+
+
+def get_default_category_order_for_stand(stand_name):
+    stand_category_order = []
+    for category_name, item_list in DEFAULT_CATEGORY_ORDER:
+        filtered_items = [
+            item for item in item_list
+            if _is_item_available_at_stand(item, stand_name)
+        ]
+        if filtered_items:
+            stand_category_order.append((category_name, filtered_items))
+    return stand_category_order
 
 # ---------------------------------------------------------------------------
 # Default category order (used when no stand-specific Master Items tab exists)
@@ -1650,7 +1740,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
             category_map[category].append(item)
         CATEGORY_ORDER = list(category_map.items())
     else:
-        CATEGORY_ORDER = DEFAULT_CATEGORY_ORDER
+        CATEGORY_ORDER = get_default_category_order_for_stand(stand_name)
 
     # ============================
     # ICE CREAM SCOOP TOTALS — compute BEFORE consolidation
