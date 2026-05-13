@@ -47,6 +47,8 @@ SYRUP_BAG_SIZES = {
 }
 
 # Industry-standard 1:5 syrup:water ratio for a 16oz fountain drink.
+# Kept as a shared constant so downstream usage/depletion math can use the
+# same value everywhere (instead of hard-coded literals).
 SYRUP_PER_16OZ_DRINK = 2.67
 
 # Sub-header labels written in row 2 for every week block.
