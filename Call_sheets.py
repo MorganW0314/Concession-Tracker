@@ -32,6 +32,7 @@ COLS_PER_WEEK = 12
 # to scoops when the Deliveries tab includes a TYPE column.
 SCOOPS_PER_TUB = 60
 PORK_SCOOPS_PER_BAG = 6
+POPCORN_PACKETS_PER_BOX = 36
 
 # Fountain syrup conversion constants.
 # 1 "package" on Deliveries-{stand} is converted to ounces automatically:
@@ -601,6 +602,7 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
             item.lower() == fountain_item.lower()
             for fountain_item in FOUNTAIN_DRINKS
         )
+        is_popcorn = item.lower() == "popcorn"
 
         if is_tofts_ice_cream:
             qty = packages * SCOOPS_PER_TUB
@@ -608,6 +610,9 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
                 f"  [Deliveries] '{item}': {packages} tub(s) → "
                 f"{qty} scoops"
             )
+        elif is_popcorn:
+            qty = packages * POPCORN_PACKETS_PER_BOX
+            print(f"  [Deliveries] '{item}': {packages} box(es) → {qty} packets")
         elif is_fountain_drink:
             bag_size_oz = SYRUP_BAG_SIZES.get(stand_name, 320)
             qty = packages * bag_size_oz
