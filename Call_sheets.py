@@ -31,6 +31,7 @@ COLS_PER_WEEK = 12
 # Number of scoops in one ice cream tub.  Used to convert "Tubs" deliveries
 # to scoops when the Deliveries tab includes a TYPE column.
 SCOOPS_PER_TUB = 60
+PORK_SCOOPS_PER_BAG = 6
 
 # Fountain syrup conversion constants.
 # 1 "package" on Deliveries-{stand} is converted to ounces automatically:
@@ -1290,7 +1291,11 @@ def consolidate_variants_to_base(
 
         # Ensure the base-flavor key exists before merging.
         if base not in rows:
-            rows[base] = {"starting": 0, "deliveries": 0, "sales": 0, "spoilage": 0}
+            rows[base] = {
+                "starting": 0, "deliveries": 0, "sales": 0,
+                "spoilage": 0, "scoops_used": 0, "tubs_used": 0,
+                "expected": 0, "actual": "",
+            }
 
         variant_data = rows.pop(variant)
         base_data = rows[base]
@@ -1503,6 +1508,7 @@ INGREDIENTS = [
     "Hot Dog Buns",
     "Chicken Salad",
     "Pulled Pork",
+    "Pulled Pork (4oz scoop)",
     "Chili Sauce",
     "Chili Sauce (0.5oz scoop)",
     "Ham",
@@ -1529,8 +1535,8 @@ INGREDIENTS = [
 INGREDIENT_MAP = {
     # Sandwiches and proteins
     "Chicken Salad Sandwich": [("Hamburger Buns", 1), ("Chicken Salad", 1)],
-    "Pulled Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork", 1)],
-    "BBQ Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork", 1)],
+    "Pulled Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork (4oz scoop)", 1)],
+    "BBQ Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork (4oz scoop)", 1)],
     "Ham and Cheese Sandwich": [("Hamburger Buns", 1), ("Ham", 1), ("Cheese", 1)],
 
     # Hot dogs / chili use
@@ -1540,8 +1546,8 @@ INGREDIENT_MAP = {
     # Nacho items
     "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 1)],
     "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Chili Sauce (0.5oz scoop)", 3)],
-    "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork", 1)],
-    "Walking Taco": [("Assorted Chips", 1), ("Chili Sauce", 2)],
+    "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork (4oz scoop)", 1)],
+    "Walking Taco": [("Assorted Chips", 1), ("Chili Sauce (0.5oz scoop)", 2)],
 
     # Snacks and frozen drinks
     "Hummus and Pita Chips": [("Hummus", 1), ("Pita Chips", 1)],
