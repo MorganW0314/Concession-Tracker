@@ -57,6 +57,40 @@ class InventoryRefactorTests(unittest.TestCase):
             [("Slushie Mix", 1), ("Frazil Cups", 1)],
         )
 
+    def test_ingredient_map_tracks_chili_and_pulled_pork_scoops(self):
+        self.assertEqual(
+            Call_sheets.INGREDIENT_MAP["Walking Taco"],
+            [("Assorted Chips", 1), ("Chili Sauce (0.5oz scoop)", 2)],
+        )
+        self.assertEqual(
+            Call_sheets.INGREDIENT_MAP["Pulled Pork Sandwich"],
+            [("Hamburger Buns", 1), ("Pulled Pork (4oz scoop)", 1)],
+        )
+        self.assertEqual(
+            Call_sheets.INGREDIENT_MAP["BBQ Pork Sandwich"],
+            [("Hamburger Buns", 1), ("Pulled Pork (4oz scoop)", 1)],
+        )
+        self.assertEqual(
+            Call_sheets.INGREDIENT_MAP["Pulled Pork Nachos"],
+            [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork (4oz scoop)", 1)],
+        )
+        self.assertIn("Pulled Pork (4oz scoop)", Call_sheets.INGREDIENTS)
+        self.assertEqual(Call_sheets.PORK_SCOOPS_PER_BAG, 6)
+
+    def test_consolidate_variants_initializes_full_base_row_shape(self):
+        rows = {"Vanilla Double Scoop": {"sales": 2, "deliveries": 3, "spoilage": 1}}
+        Call_sheets.consolidate_variants_to_base(rows, {"Vanilla Double Scoop": "Vanilla"})
+
+        self.assertIn("Vanilla", rows)
+        self.assertEqual(rows["Vanilla"]["starting"], 0)
+        self.assertEqual(rows["Vanilla"]["deliveries"], 3)
+        self.assertEqual(rows["Vanilla"]["sales"], 2)
+        self.assertEqual(rows["Vanilla"]["spoilage"], 1)
+        self.assertEqual(rows["Vanilla"]["scoops_used"], 0)
+        self.assertEqual(rows["Vanilla"]["tubs_used"], 0)
+        self.assertEqual(rows["Vanilla"]["expected"], 0)
+        self.assertEqual(rows["Vanilla"]["actual"], "")
+
     def test_get_default_category_order_for_stand_filters_location_items(self):
         bexley = dict(Call_sheets.get_default_category_order_for_stand("Bexley"))
         self.assertNotIn("Mint Chip", bexley["ICE_CREAM_TOFTS"])
