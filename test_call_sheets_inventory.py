@@ -91,6 +91,15 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(rows["Vanilla"]["expected"], 0)
         self.assertEqual(rows["Vanilla"]["actual"], "")
 
+    def test_consolidate_variants_skips_self_mapped_base_flavor(self):
+        rows = {"Chocolate": {"sales": 2, "deliveries": 3, "spoilage": 1}}
+        Call_sheets.consolidate_variants_to_base(rows, {"Chocolate": "Chocolate"})
+
+        self.assertEqual(
+            rows,
+            {"Chocolate": {"sales": 2, "deliveries": 3, "spoilage": 1}},
+        )
+
     def test_get_default_category_order_for_stand_filters_location_items(self):
         bexley = dict(Call_sheets.get_default_category_order_for_stand("Bexley"))
         self.assertNotIn("Mint Chip", bexley["ICE_CREAM_TOFTS"])

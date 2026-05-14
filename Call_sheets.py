@@ -1289,6 +1289,9 @@ def consolidate_variants_to_base(
         if variant not in rows:
             continue
 
+        if variant == base:
+            continue
+
         # Ensure the base-flavor key exists before merging.
         if base not in rows:
             rows[base] = {
