@@ -1412,7 +1412,6 @@ FOUNTAIN_DRINKS = [
     "Coca Cola",
     "Diet Coke",
     "Diet Pepsi",
-    "Mt. Dew",
     "Pepsi",
     "Starry",
 ]
@@ -1567,14 +1566,16 @@ PREMIUM_ICE_CREAM_ITEMS = {
 PREMIUM_ICE_CREAM_STANDS = {"PTAC", "NWSC", "Treemont", "Hilliard West"}
 
 LOCATION_SPECIFIC_ITEM_STANDS = {
+    "7up": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
+    "Big Red": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
+    "Diet RC": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
+    "RC Cola": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
     "Coca Cola": {"Reed Road", "Treemont", "Devon"},
     "Diet Coke": {"Reed Road", "Treemont", "Devon"},
     "Diet Coke - UA ONLY": {"Reed Road", "Treemont", "Devon"},
     "Diet Pepsi": {"PTAC"},
-    "Mt. Dew": {"PTAC"},
     "Pepsi": {"PTAC"},
     "Starry": {"PTAC"},
-    "Big Red": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
     "Popcorn": {"Treemont", "Reed Road", "NWSC"},
 }
 

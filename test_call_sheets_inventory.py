@@ -105,20 +105,42 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertNotIn("Mint Chip", bexley["ICE_CREAM_TOFTS"])
         self.assertNotIn("Coca Cola", bexley["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet Pepsi", bexley["FOUNTAIN_DRINKS"])
+        self.assertIn("7up", bexley["FOUNTAIN_DRINKS"])
+        self.assertIn("Diet RC", bexley["FOUNTAIN_DRINKS"])
+        self.assertIn("RC Cola", bexley["FOUNTAIN_DRINKS"])
 
         ptac = dict(Call_sheets.get_default_category_order_for_stand("PTAC"))
         self.assertIn("Mint Chip", ptac["ICE_CREAM_TOFTS"])
-        self.assertIn("Diet Pepsi", ptac["FOUNTAIN_DRINKS"])
+        self.assertEqual(
+            set(ptac["FOUNTAIN_DRINKS"]),
+            {"Dr. Pepper", "Root Beer", "Diet Pepsi", "Pepsi", "Starry"},
+        )
         self.assertNotIn("Coca Cola", ptac["FOUNTAIN_DRINKS"])
+        self.assertNotIn("7up", ptac["FOUNTAIN_DRINKS"])
+        self.assertNotIn("Big Red", ptac["FOUNTAIN_DRINKS"])
+        self.assertNotIn("Diet RC", ptac["FOUNTAIN_DRINKS"])
+        self.assertNotIn("RC Cola", ptac["FOUNTAIN_DRINKS"])
 
         treemont = dict(Call_sheets.get_default_category_order_for_stand("Treemont"))
         self.assertIn("Mint Chip", treemont["ICE_CREAM_TOFTS"])
         self.assertIn("Coca Cola", treemont["FOUNTAIN_DRINKS"])
+        self.assertTrue(
+            {"7up", "Big Red", "Diet RC", "Dr. Pepper", "Root Beer", "RC Cola", "Coca Cola"}.issubset(
+                set(treemont["FOUNTAIN_DRINKS"])
+            )
+        )
         self.assertNotIn("Diet Pepsi", treemont["FOUNTAIN_DRINKS"])
+        self.assertNotIn("Pepsi", treemont["FOUNTAIN_DRINKS"])
+        self.assertNotIn("Starry", treemont["FOUNTAIN_DRINKS"])
+
+    def test_fountain_drinks_list_excludes_mt_dew_and_lemonade(self):
+        self.assertNotIn("Mt. Dew", Call_sheets.FOUNTAIN_DRINKS)
+        self.assertNotIn("Lemonade", Call_sheets.FOUNTAIN_DRINKS)
 
     def test_read_deliveries_converts_fountain_packages_to_stand_oz(self):
         header = [["Date", "Item Name", "Packages", "Units per package"]]
         rows = [["05-10-2026", "Diet RC", "2", "1"]]
+        root_beer_rows = [["05-10-2026", "Root Beer", "1", "1"]]
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
             ptac = Call_sheets.read_deliveries(object(), "sid", "PTAC")
@@ -127,6 +149,14 @@ class InventoryRefactorTests(unittest.TestCase):
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
             reed = Call_sheets.read_deliveries(object(), "sid", "Reed Road")
         self.assertEqual(reed["Diet RC"], 640)
+
+        with patch.object(Call_sheets, "get_values", side_effect=[header, root_beer_rows]):
+            ptac_root_beer = Call_sheets.read_deliveries(object(), "sid", "PTAC")
+        self.assertEqual(ptac_root_beer["Root Beer"], 640)
+
+        with patch.object(Call_sheets, "get_values", side_effect=[header, root_beer_rows]):
+            reed_root_beer = Call_sheets.read_deliveries(object(), "sid", "Reed Road")
+        self.assertEqual(reed_root_beer["Root Beer"], 320)
 
 
 if __name__ == "__main__":
