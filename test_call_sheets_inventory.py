@@ -76,6 +76,14 @@ class InventoryRefactorTests(unittest.TestCase):
         )
         self.assertIn("Pulled Pork (4oz scoop)", Call_sheets.INGREDIENTS)
         self.assertEqual(Call_sheets.PORK_SCOOPS_PER_BAG, 6)
+        self.assertEqual(Call_sheets.POPCORN_PACKETS_PER_BOX, 36)
+
+    def test_popcorn_location_restrictions(self):
+        self.assertIn("Popcorn", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
+        self.assertEqual(
+            Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Popcorn"],
+            {"Treemont", "Reed Road", "NWSC"},
+        )
 
     def test_consolidate_variants_initializes_full_base_row_shape(self):
         rows = {"Vanilla Double Scoop": {"sales": 2, "deliveries": 3, "spoilage": 1}}
@@ -141,6 +149,7 @@ class InventoryRefactorTests(unittest.TestCase):
         header = [["Date", "Item Name", "Packages", "Units per package"]]
         rows = [["05-10-2026", "Diet RC", "2", "1"]]
         root_beer_rows = [["05-10-2026", "Root Beer", "1", "1"]]
+        popcorn_rows = [["05-10-2026", "Popcorn", "2", "999"]]
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
             ptac = Call_sheets.read_deliveries(object(), "sid", "PTAC")
@@ -157,6 +166,10 @@ class InventoryRefactorTests(unittest.TestCase):
         with patch.object(Call_sheets, "get_values", side_effect=[header, root_beer_rows]):
             reed_root_beer = Call_sheets.read_deliveries(object(), "sid", "Reed Road")
         self.assertEqual(reed_root_beer["Root Beer"], 320)
+
+        with patch.object(Call_sheets, "get_values", side_effect=[header, popcorn_rows]):
+            reed_popcorn = Call_sheets.read_deliveries(object(), "sid", "Reed Road")
+        self.assertEqual(reed_popcorn["Popcorn"], 72)
 
 
 if __name__ == "__main__":
