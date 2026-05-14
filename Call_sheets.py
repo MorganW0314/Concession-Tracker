@@ -40,13 +40,13 @@ POPCORN_PACKETS_PER_BOX = 36
 #   PTAC uses 640oz bags; all other known stands in this map use 320oz bags.
 SYRUP_BAG_SIZES = {
     "PTAC": 640,
-    "Reed Road": 320,
-    "Treemont": 320,
-    "Devon": 320,
+    "REED ROAD": 320,
+    "TREMONT": 320,
+    "DEVON": 320,
     "NWSC": 320,
-    "Hilliard East": 320,
-    "Hilliard West": 320,
-    "Bexley": 320,
+    "HILLIARD2 (EAST)": 320,
+    "HILLIARD1 (WEST)": 320,
+    "BEXLEY": 320,
 }
 
 # Industry-standard 1:5 syrup:water ratio for a 16oz fountain drink.
@@ -1450,6 +1450,8 @@ FOOD = [
     "Pizza",
     "Chicken Salad",
     "Hot Dog",
+    "Chili Sauce (cans)",
+    "Pulled Pork (bags)",
     "Uncrustable",
     "Nacho Chips",
     "Nacho Cheese",
@@ -1518,9 +1520,7 @@ INGREDIENTS = [
     "Hamburger Buns",
     "Hot Dog Buns",
     "Chicken Salad",
-    "Pulled Pork",
     "Pulled Pork (bags)",
-    "Chili Sauce",
     "Chili Sauce (cans)",
     "Ham",
     "Cheese",
@@ -1572,20 +1572,20 @@ PREMIUM_ICE_CREAM_ITEMS = {
     "Blueberry Waffle Cone",
 }
 
-PREMIUM_ICE_CREAM_STANDS = {"PTAC", "NWSC", "Treemont", "Hilliard West"}
+PREMIUM_ICE_CREAM_STANDS = {"PTAC", "NWSC", "TREMONT", "HILLIARD1 (WEST)"}
 
 LOCATION_SPECIFIC_ITEM_STANDS = {
-    "7up": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
-    "Big Red": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
-    "Diet RC": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
-    "RC Cola": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
-    "Coca Cola": {"Reed Road", "Treemont", "Devon"},
-    "Diet Coke": {"Reed Road", "Treemont", "Devon"},
-    "Diet Coke - UA ONLY": {"Reed Road", "Treemont", "Devon"},
+    "7up": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
+    "Big Red": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
+    "Diet RC": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
+    "RC Cola": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
+    "Coca Cola": {"REED ROAD", "TREMONT", "DEVON"},
+    "Diet Coke": {"REED ROAD", "TREMONT", "DEVON"},
+    "Diet Coke - UA ONLY": {"REED ROAD", "TREMONT", "DEVON"},
     "Diet Pepsi": {"PTAC"},
     "Pepsi": {"PTAC"},
     "Starry": {"PTAC"},
-    "Popcorn": {"Treemont", "Reed Road", "NWSC"},
+    "Popcorn": {"TREMONT", "REED ROAD", "NWSC"},
 }
 
 

@@ -95,7 +95,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertIn("Popcorn", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
         self.assertEqual(
             Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Popcorn"],
-            {"Treemont", "Reed Road", "NWSC"},
+            {"TREMONT", "REED ROAD", "NWSC"},
         )
 
     def test_consolidate_variants_initializes_full_base_row_shape(self):
@@ -122,7 +122,7 @@ class InventoryRefactorTests(unittest.TestCase):
         )
 
     def test_get_default_category_order_for_stand_filters_location_items(self):
-        bexley = dict(Call_sheets.get_default_category_order_for_stand("Bexley"))
+        bexley = dict(Call_sheets.get_default_category_order_for_stand("BEXLEY"))
         self.assertNotIn("Mint Chip", bexley["ICE_CREAM_TOFTS"])
         self.assertNotIn("Coca Cola", bexley["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet Pepsi", bexley["FOUNTAIN_DRINKS"])
@@ -142,7 +142,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertNotIn("Diet RC", ptac["FOUNTAIN_DRINKS"])
         self.assertNotIn("RC Cola", ptac["FOUNTAIN_DRINKS"])
 
-        treemont = dict(Call_sheets.get_default_category_order_for_stand("Treemont"))
+        treemont = dict(Call_sheets.get_default_category_order_for_stand("TREMONT"))
         self.assertIn("Mint Chip", treemont["ICE_CREAM_TOFTS"])
         self.assertIn("Coca Cola", treemont["FOUNTAIN_DRINKS"])
         self.assertTrue(
@@ -170,7 +170,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(ptac["Diet RC"], 1280)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
-            reed = Call_sheets.read_deliveries(object(), "sid", "Reed Road")
+            reed = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed["Diet RC"], 640)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, root_beer_rows]):
@@ -178,11 +178,11 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(ptac_root_beer["Root Beer"], 640)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, root_beer_rows]):
-            reed_root_beer = Call_sheets.read_deliveries(object(), "sid", "Reed Road")
+            reed_root_beer = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_root_beer["Root Beer"], 320)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, popcorn_rows]):
-            reed_popcorn = Call_sheets.read_deliveries(object(), "sid", "Reed Road")
+            reed_popcorn = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_popcorn["Popcorn"], 72)
 
 
