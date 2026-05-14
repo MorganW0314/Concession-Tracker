@@ -149,7 +149,8 @@ class InventoryRefactorTests(unittest.TestCase):
         header = [["Date", "Item Name", "Packages", "Units per package"]]
         rows = [["05-10-2026", "Diet RC", "2", "1"]]
         root_beer_rows = [["05-10-2026", "Root Beer", "1", "1"]]
-        popcorn_rows = [["05-10-2026", "Popcorn", "2", "999"]]
+        ignored_units_per_package = "999"
+        popcorn_rows = [["05-10-2026", "Popcorn", "2", ignored_units_per_package]]
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
             ptac = Call_sheets.read_deliveries(object(), "sid", "PTAC")
