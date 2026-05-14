@@ -1396,10 +1396,9 @@ CANDY = [
 
 FOUNTAIN_DRINKS = [
     "7up",
-    "Sunkist",
+    "Big Red",
     "Diet RC",
     "Dr. Pepper",
-    "Lemonade",
     "Root Beer",
     "RC Cola",
     "Coca Cola",
@@ -1457,6 +1456,7 @@ SNACKS = [
     "Pickles",
     "Go-Go Squeez",
     "Oranges",
+    "Popcorn",
 ]
 
 DISPOSABLES = [
@@ -1504,6 +1504,7 @@ INGREDIENTS = [
     "Chicken Salad",
     "Pulled Pork",
     "Chili Sauce",
+    "Chili Sauce (0.5oz scoop)",
     "Ham",
     "Cheese",
     "Nacho Chips",
@@ -1534,11 +1535,11 @@ INGREDIENT_MAP = {
 
     # Hot dogs / chili use
     "Hot Dog": [("Hot Dog Buns", 1)],
-    "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Chili Sauce", 1)],
+    "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Chili Sauce (0.5oz scoop)", 1)],
 
     # Nacho items
     "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 1)],
-    "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Chili Sauce", 3)],
+    "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Chili Sauce (0.5oz scoop)", 3)],
     "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork", 1)],
     "Walking Taco": [("Assorted Chips", 1), ("Chili Sauce", 2)],
 
@@ -1564,6 +1565,8 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Mt. Dew": {"PTAC"},
     "Pepsi": {"PTAC"},
     "Starry": {"PTAC"},
+    "Big Red": {"Reed Road", "Treemont", "Devon", "NWSC", "Hilliard East", "Hilliard West", "Bexley"},
+    "Popcorn": {"Treemont", "Reed Road", "NWSC"},
 }
 
 
