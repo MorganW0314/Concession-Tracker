@@ -2,7 +2,7 @@ import csv
 import logging
 from unittest import result
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
+from googleapiclient.discovery import build # type: ignore
 from collections import defaultdict
 from datetime import datetime, timedelta
 import re
