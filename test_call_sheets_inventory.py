@@ -60,23 +60,36 @@ class InventoryRefactorTests(unittest.TestCase):
     def test_ingredient_map_tracks_chili_and_pulled_pork_scoops(self):
         self.assertEqual(
             Call_sheets.INGREDIENT_MAP["Walking Taco"],
-            [("Assorted Chips", 1), ("Chili Sauce (0.5oz scoop)", 2)],
+            [("Assorted Chips", 1), ("Chili Sauce (cans)", 2)],
         )
         self.assertEqual(
             Call_sheets.INGREDIENT_MAP["Pulled Pork Sandwich"],
-            [("Hamburger Buns", 1), ("Pulled Pork (4oz scoop)", 1)],
+            [("Hamburger Buns", 1), ("Pulled Pork (bags)", 1)],
         )
         self.assertEqual(
             Call_sheets.INGREDIENT_MAP["BBQ Pork Sandwich"],
-            [("Hamburger Buns", 1), ("Pulled Pork (4oz scoop)", 1)],
+            [("Hamburger Buns", 1), ("Pulled Pork (bags)", 1)],
         )
         self.assertEqual(
             Call_sheets.INGREDIENT_MAP["Pulled Pork Nachos"],
-            [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork (4oz scoop)", 1)],
+            [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork (bags)", 1)],
         )
-        self.assertIn("Pulled Pork (4oz scoop)", Call_sheets.INGREDIENTS)
+        self.assertIn("Pulled Pork (bags)", Call_sheets.INGREDIENTS)
+        self.assertIn("Chili Sauce (cans)", Call_sheets.INGREDIENTS)
+        self.assertEqual(Call_sheets.CHILI_SCOOPS_PER_CAN, 30)
         self.assertEqual(Call_sheets.PORK_SCOOPS_PER_BAG, 6)
         self.assertEqual(Call_sheets.POPCORN_PACKETS_PER_BOX, 36)
+
+    def test_calculate_ingredients_per_stand_converts_to_cans_and_bags(self):
+        rows = {
+            "Walking Taco": {"sales": 15},
+            "Pulled Pork Sandwich": {"sales": 6},
+        }
+
+        result = Call_sheets.calculate_ingredients_per_stand(rows)
+
+        self.assertEqual(result["Chili Sauce (cans)"]["sales"], 1.0)
+        self.assertEqual(result["Pulled Pork (bags)"]["sales"], 1.0)
 
     def test_popcorn_location_restrictions(self):
         self.assertIn("Popcorn", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)

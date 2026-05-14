@@ -32,6 +32,7 @@ COLS_PER_WEEK = 12
 # to scoops when the Deliveries tab includes a TYPE column.
 SCOOPS_PER_TUB = 60
 PORK_SCOOPS_PER_BAG = 6
+CHILI_SCOOPS_PER_CAN = 30
 POPCORN_PACKETS_PER_BOX = 36
 
 # Fountain syrup conversion constants.
@@ -805,6 +806,11 @@ def calculate_ingredients_per_stand(rows, ingredient_map=None):
                 }
             rows[ingredient_name]["sales"] += qty_sold * qty_per_sale
 
+    if "Chili Sauce (cans)" in rows:
+        rows["Chili Sauce (cans)"]["sales"] = round(rows["Chili Sauce (cans)"]["sales"] / CHILI_SCOOPS_PER_CAN, 2)
+    if "Pulled Pork (bags)" in rows:
+        rows["Pulled Pork (bags)"]["sales"] = round(rows["Pulled Pork (bags)"]["sales"] / PORK_SCOOPS_PER_BAG, 2)
+
     return rows
 
 
@@ -1444,8 +1450,6 @@ FOOD = [
     "Pizza",
     "Chicken Salad",
     "Hot Dog",
-    "Chili Sauce",
-    "Pulled Pork",
     "Uncrustable",
     "Nacho Chips",
     "Nacho Cheese",
@@ -1515,9 +1519,9 @@ INGREDIENTS = [
     "Hot Dog Buns",
     "Chicken Salad",
     "Pulled Pork",
-    "Pulled Pork (4oz scoop)",
+    "Pulled Pork (bags)",
     "Chili Sauce",
-    "Chili Sauce (0.5oz scoop)",
+    "Chili Sauce (cans)",
     "Ham",
     "Cheese",
     "Nacho Chips",
@@ -1542,19 +1546,19 @@ INGREDIENTS = [
 INGREDIENT_MAP = {
     # Sandwiches and proteins
     "Chicken Salad Sandwich": [("Hamburger Buns", 1), ("Chicken Salad", 1)],
-    "Pulled Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork (4oz scoop)", 1)],
-    "BBQ Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork (4oz scoop)", 1)],
+    "Pulled Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork (bags)", 1)],
+    "BBQ Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork (bags)", 1)],
     "Ham and Cheese Sandwich": [("Hamburger Buns", 1), ("Ham", 1), ("Cheese", 1)],
 
     # Hot dogs / chili use
     "Hot Dog": [("Hot Dog Buns", 1)],
-    "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Chili Sauce (0.5oz scoop)", 1)],
+    "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Chili Sauce (cans)", 1)],
 
     # Nacho items
     "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 1)],
-    "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Chili Sauce (0.5oz scoop)", 3)],
-    "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork (4oz scoop)", 1)],
-    "Walking Taco": [("Assorted Chips", 1), ("Chili Sauce (0.5oz scoop)", 2)],
+    "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Chili Sauce (cans)", 3)],
+    "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork (bags)", 1)],
+    "Walking Taco": [("Assorted Chips", 1), ("Chili Sauce (cans)", 2)],
 
     # Snacks and frozen drinks
     "Hummus and Pita Chips": [("Hummus", 1), ("Pita Chips", 1)],
