@@ -80,7 +80,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(Call_sheets.PORK_SCOOPS_PER_BAG, 6)
         self.assertEqual(Call_sheets.POPCORN_PACKETS_PER_BOX, 36)
 
-    def test_hot_dog_frank_tracking_configuration(self):
+    def test_hot_dog_ingredient_configuration(self):
         self.assertEqual(
             Call_sheets.INGREDIENT_MAP["Hot Dog"],
             [("Hot Dog Buns", 1)],
