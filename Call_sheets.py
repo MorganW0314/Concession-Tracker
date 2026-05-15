@@ -631,15 +631,15 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
                 f"  [Deliveries] '{item}': {packages} bag(s) at "
                 f"{stand_name} → {qty} oz syrup"
             )
+        elif is_popcorn:
+            qty = packages * POPCORN_PACKETS_PER_BOX
+            print(f"  [Deliveries] '{item}': {packages} box(es) → {qty} packets")
         elif is_nacho_cheese:
             qty = packages * NACHO_CHEESE_OZ_PER_BAG
             print(f"  [Deliveries] '{item}': {packages} bag(s) → {qty} oz nacho cheese")
         elif is_chicken_salad:
             qty = packages * CHICKEN_SALAD_SCOOPS_PER_TUB
             print(f"  [Deliveries] '{item}': {packages} tub(s) → {qty} scoops chicken salad")
-        elif is_popcorn:
-            qty = packages * POPCORN_PACKETS_PER_BOX
-            print(f"  [Deliveries] '{item}': {packages} box(es) → {qty} packets")
         else:
             qty = packages * units_per
 
@@ -1581,7 +1581,7 @@ INGREDIENT_MAP = {
     "Hot Dog": [("Hot Dog Buns", 1)],
     "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Chili Sauce (cans)", 1)],
 
-    # Nacho items
+    # Nacho items (nacho cheese quantities are ounces per sale; 3oz each)
     "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 3)],
     "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 3), ("Chili Sauce (cans)", 3)],
     "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 3), ("Pulled Pork (bags)", 1)],
