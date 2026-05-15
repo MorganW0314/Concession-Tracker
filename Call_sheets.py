@@ -35,6 +35,17 @@ PORK_SCOOPS_PER_BAG = 6
 CHILI_SCOOPS_PER_CAN = 30
 POPCORN_PACKETS_PER_BOX = 36
 
+# Nacho cheese conversion constants.
+# Delivered in 140oz bags; each nacho serving uses 3oz.
+NACHO_CHEESE_OZ_PER_BAG = 140
+NACHO_CHEESE_OZ_PER_SERVING = 3
+
+# Chicken salad conversion constants.
+# Delivered in 48oz tubs; each sandwich uses a 4oz scoop (12 scoops per tub).
+CHICKEN_SALAD_OZ_PER_TUB = 48
+CHICKEN_SALAD_OZ_PER_SCOOP = 4
+CHICKEN_SALAD_SCOOPS_PER_TUB = CHICKEN_SALAD_OZ_PER_TUB // CHICKEN_SALAD_OZ_PER_SCOOP  # = 12
+
 # Fountain syrup conversion constants.
 # 1 "package" on Deliveries-{stand} is converted to ounces automatically:
 #   PTAC uses 640oz bags; all other known stands in this map use 320oz bags.
@@ -604,6 +615,8 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
             for fountain_item in FOUNTAIN_DRINKS
         )
         is_popcorn = item.lower() == "popcorn"
+        is_nacho_cheese = item.lower() == "nacho cheese"
+        is_chicken_salad = item.lower() == "chicken salad"
 
         if is_tofts_ice_cream:
             qty = packages * SCOOPS_PER_TUB
@@ -611,9 +624,6 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
                 f"  [Deliveries] '{item}': {packages} tub(s) → "
                 f"{qty} scoops"
             )
-        elif is_popcorn:
-            qty = packages * POPCORN_PACKETS_PER_BOX
-            print(f"  [Deliveries] '{item}': {packages} box(es) → {qty} packets")
         elif is_fountain_drink:
             bag_size_oz = SYRUP_BAG_SIZES.get(stand_name, 320)
             qty = packages * bag_size_oz
@@ -621,6 +631,15 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
                 f"  [Deliveries] '{item}': {packages} bag(s) at "
                 f"{stand_name} → {qty} oz syrup"
             )
+        elif is_popcorn:
+            qty = packages * POPCORN_PACKETS_PER_BOX
+            print(f"  [Deliveries] '{item}': {packages} box(es) → {qty} packets")
+        elif is_nacho_cheese:
+            qty = packages * NACHO_CHEESE_OZ_PER_BAG
+            print(f"  [Deliveries] '{item}': {packages} bag(s) → {qty} oz nacho cheese")
+        elif is_chicken_salad:
+            qty = packages * CHICKEN_SALAD_SCOOPS_PER_TUB
+            print(f"  [Deliveries] '{item}': {packages} tub(s) → {qty} scoops chicken salad")
         else:
             qty = packages * units_per
 
@@ -810,6 +829,14 @@ def calculate_ingredients_per_stand(rows, ingredient_map=None):
         rows["Chili Sauce (cans)"]["sales"] = round(rows["Chili Sauce (cans)"]["sales"] / CHILI_SCOOPS_PER_CAN, 2)
     if "Pulled Pork (bags)" in rows:
         rows["Pulled Pork (bags)"]["sales"] = round(rows["Pulled Pork (bags)"]["sales"] / PORK_SCOOPS_PER_BAG, 2)
+    if "Nacho Cheese" in rows:
+        oz_used = rows["Nacho Cheese"].get("sales", 0)
+        if oz_used > 0:
+            rows["Nacho Cheese"]["sales"] = round(oz_used / NACHO_CHEESE_OZ_PER_BAG, 2)
+    if "Chicken Salad" in rows:
+        scoops_used = rows["Chicken Salad"].get("sales", 0)
+        if scoops_used > 0:
+            rows["Chicken Salad"]["sales"] = round(scoops_used / CHICKEN_SALAD_SCOOPS_PER_TUB, 2)
 
     return rows
 
@@ -1554,10 +1581,10 @@ INGREDIENT_MAP = {
     "Hot Dog": [("Hot Dog Buns", 1)],
     "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Chili Sauce (cans)", 1)],
 
-    # Nacho items
-    "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 1)],
-    "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Chili Sauce (cans)", 3)],
-    "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 1), ("Pulled Pork (bags)", 1)],
+    # Nacho items (nacho cheese quantities are ounces per sale; 3oz each)
+    "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 3)],
+    "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 3), ("Chili Sauce (cans)", 3)],
+    "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 3), ("Pulled Pork (bags)", 1)],
     "Walking Taco": [("Assorted Chips", 1), ("Chili Sauce (cans)", 2)],
 
     # Snacks and frozen drinks

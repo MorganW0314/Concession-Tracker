@@ -10,6 +10,7 @@ COMBO_BREAKDOWN = {
     "Chicken Salad Combo Meal": ["Chicken Salad Sandwich", "Assorted Chips"],
     "Hot Dog Combo Meal": ["Hot Dog", "Assorted Chips"],
     "Pizza Combo Meal": ["Pizza", "Assorted Chips"],
+    "Whole Jet's Pizza": ["Pizza", "Pizza", "Pizza", "Pizza", "Pizza", "Pizza", "Pizza", "Pizza"],
     "Pulled Pork Combo Meal": ["Pulled Pork", "Assorted Chips"],
 }
 
