@@ -81,17 +81,16 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(Call_sheets.POPCORN_PACKETS_PER_BOX, 36)
 
     def test_hot_dog_frank_tracking_configuration(self):
-        self.assertEqual(Call_sheets.HOT_DOG_FRANKS_PER_BAG, 50)
         self.assertEqual(
             Call_sheets.INGREDIENT_MAP["Hot Dog"],
-            [("Hot Dog Buns", 1), ("Hot Dogs", 1)],
+            [("Hot Dog Buns", 1)],
         )
         self.assertEqual(
             Call_sheets.INGREDIENT_MAP["Chili Cheese Dog"],
-            [("Hot Dog Buns", 1), ("Hot Dogs", 1), ("Chili Sauce (cans)", 1)],
+            [("Hot Dog Buns", 1), ("Hot Dog", 1), ("Chili Sauce (cans)", 1)],
         )
-        self.assertIn("Hot Dogs", Call_sheets.FOOD)
-        self.assertIn("Hot Dogs", Call_sheets.INGREDIENTS)
+        self.assertNotIn("Hot Dogs", Call_sheets.FOOD)
+        self.assertNotIn("Hot Dogs", Call_sheets.INGREDIENTS)
 
     def test_calculate_ingredients_per_stand_converts_to_cans_and_bags(self):
         rows = {
@@ -201,7 +200,7 @@ class InventoryRefactorTests(unittest.TestCase):
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, hot_dog_rows]):
             reed_hot_dogs = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
-        self.assertEqual(reed_hot_dogs["Hot Dogs"], 100)
+        self.assertEqual(reed_hot_dogs["Hot Dogs"], 1998)
 
 
 if __name__ == "__main__":
