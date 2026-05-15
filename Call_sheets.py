@@ -34,6 +34,7 @@ SCOOPS_PER_TUB = 60
 PORK_SCOOPS_PER_BAG = 6
 CHILI_SCOOPS_PER_CAN = 30
 POPCORN_PACKETS_PER_BOX = 36
+HOT_DOG_FRANKS_PER_BAG = 50
 
 # Nacho cheese conversion constants.
 # Delivered in 140oz bags; each nacho serving uses 3oz.
@@ -617,6 +618,7 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         is_popcorn = item.lower() == "popcorn"
         is_nacho_cheese = item.lower() == "nacho cheese"
         is_chicken_salad = item.lower() == "chicken salad"
+        is_hot_dogs = item.lower() == "hot dogs"
 
         if is_tofts_ice_cream:
             qty = packages * SCOOPS_PER_TUB
@@ -640,6 +642,9 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         elif is_chicken_salad:
             qty = packages * CHICKEN_SALAD_SCOOPS_PER_TUB
             print(f"  [Deliveries] '{item}': {packages} tub(s) → {qty} scoops chicken salad")
+        elif is_hot_dogs:
+            qty = packages * HOT_DOG_FRANKS_PER_BAG
+            print(f"  [Deliveries] '{item}': {packages} bag(s) → {qty} hot dog franks")
         else:
             qty = packages * units_per
 
@@ -1484,6 +1489,7 @@ FOOD = [
     "Nacho Cheese",
     "Hamburger Buns",
     "Hot Dog Buns",
+    "Hot Dogs",
     "Soft Pretzel",
     "Salad",
     "Ham",
@@ -1546,6 +1552,7 @@ JANITORIAL = [
 INGREDIENTS = [
     "Hamburger Buns",
     "Hot Dog Buns",
+    "Hot Dogs",
     "Chicken Salad",
     "Pulled Pork (bags)",
     "Chili Sauce (cans)",
@@ -1578,8 +1585,8 @@ INGREDIENT_MAP = {
     "Ham and Cheese Sandwich": [("Hamburger Buns", 1), ("Ham", 1), ("Cheese", 1)],
 
     # Hot dogs / chili use
-    "Hot Dog": [("Hot Dog Buns", 1)],
-    "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Chili Sauce (cans)", 1)],
+    "Hot Dog": [("Hot Dog Buns", 1), ("Hot Dogs", 1)],
+    "Chili Cheese Dog": [("Hot Dog Buns", 1), ("Hot Dogs", 1), ("Chili Sauce (cans)", 1)],
 
     # Nacho items (nacho cheese quantities are ounces per sale; 3oz each)
     "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 3)],
