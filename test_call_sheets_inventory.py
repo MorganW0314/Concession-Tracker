@@ -80,6 +80,19 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(Call_sheets.PORK_SCOOPS_PER_BAG, 6)
         self.assertEqual(Call_sheets.POPCORN_PACKETS_PER_BOX, 36)
 
+    def test_hot_dog_frank_tracking_configuration(self):
+        self.assertEqual(Call_sheets.HOT_DOG_FRANKS_PER_BAG, 50)
+        self.assertEqual(
+            Call_sheets.INGREDIENT_MAP["Hot Dog"],
+            [("Hot Dog Buns", 1), ("Hot Dogs", 1)],
+        )
+        self.assertEqual(
+            Call_sheets.INGREDIENT_MAP["Chili Cheese Dog"],
+            [("Hot Dog Buns", 1), ("Hot Dogs", 1), ("Chili Sauce (cans)", 1)],
+        )
+        self.assertIn("Hot Dogs", Call_sheets.FOOD)
+        self.assertIn("Hot Dogs", Call_sheets.INGREDIENTS)
+
     def test_calculate_ingredients_per_stand_converts_to_cans_and_bags(self):
         rows = {
             "Walking Taco": {"sales": 15},
@@ -164,6 +177,7 @@ class InventoryRefactorTests(unittest.TestCase):
         root_beer_rows = [["05-10-2026", "Root Beer", "1", "1"]]
         ignored_units_per_package = "999"
         popcorn_rows = [["05-10-2026", "Popcorn", "2", ignored_units_per_package]]
+        hot_dog_rows = [["05-10-2026", "Hot Dogs", "2", ignored_units_per_package]]
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
             ptac = Call_sheets.read_deliveries(object(), "sid", "PTAC")
@@ -184,6 +198,10 @@ class InventoryRefactorTests(unittest.TestCase):
         with patch.object(Call_sheets, "get_values", side_effect=[header, popcorn_rows]):
             reed_popcorn = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_popcorn["Popcorn"], 72)
+
+        with patch.object(Call_sheets, "get_values", side_effect=[header, hot_dog_rows]):
+            reed_hot_dogs = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
+        self.assertEqual(reed_hot_dogs["Hot Dogs"], 100)
 
 
 if __name__ == "__main__":
