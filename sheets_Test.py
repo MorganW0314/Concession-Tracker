@@ -376,12 +376,6 @@ class ConcessionApp(tk.Tk):
                 sheet,
                 SPREADSHEET_ID,
                 STANDS,
-                smtp_host=os.getenv("CONCESSION_SMTP_HOST"),
-                smtp_port=os.getenv("CONCESSION_SMTP_PORT"),
-                smtp_username=os.getenv("CONCESSION_SMTP_USERNAME"),
-                smtp_password=os.getenv("CONCESSION_SMTP_PASSWORD"),
-                sender=os.getenv("CONCESSION_EMAIL_SENDER"),
-                recipient=os.getenv("CONCESSION_EMAIL_RECIPIENT"),
             )
             if sent:
                 self._log("Summary email sent successfully.", "SUCCESS")

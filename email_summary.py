@@ -85,13 +85,20 @@ def _read_latest_week_rows(sheet, spreadsheet_id: str, stand_name: str) -> List[
     return parsed
 
 
+def _negative_from_rows(rows: List[dict]) -> List[dict]:
+    return sorted(
+        [r for r in rows if r["actual"] is not None and r["actual"] < r["expected"]],
+        key=lambda r: r["variance"],
+    )
+
+
 def get_negative_variance_items(sheet, spreadsheet_id: str, stand_names: Iterable[str]) -> Dict[str, List[dict]]:
     negatives = {}
     for stand_name in stand_names:
         rows = _read_latest_week_rows(sheet, spreadsheet_id, stand_name)
-        flagged = [r for r in rows if r["actual"] is not None and r["actual"] < r["expected"]]
+        flagged = _negative_from_rows(rows)
         if flagged:
-            negatives[stand_name] = sorted(flagged, key=lambda r: r["variance"])
+            negatives[stand_name] = flagged
     return negatives
 
 
@@ -248,13 +255,7 @@ def send_summary_email(
 
     stand_names = list(stand_names)
     stand_rows = {stand_name: _read_latest_week_rows(sheet, spreadsheet_id, stand_name) for stand_name in stand_names}
-    negative_items = {
-        stand_name: sorted(
-            [row for row in rows if row["actual"] is not None and row["actual"] < row["expected"]],
-            key=lambda r: r["variance"],
-        )
-        for stand_name, rows in stand_rows.items()
-    }
+    negative_items = {stand_name: _negative_from_rows(rows) for stand_name, rows in stand_rows.items()}
     negative_items = {stand_name: rows for stand_name, rows in negative_items.items() if rows}
     week_label = _get_week_label(sheet, spreadsheet_id, stand_names)
     body = generate_email_body(stand_names, negative_items, stand_rows=stand_rows, week_label=week_label)
