@@ -2411,6 +2411,157 @@ def write_modifier_sales_to_week(sheet, service, spreadsheet_id, stand_name, mod
 
 
 
+def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
+    """Sync the expected item list into Column A of an existing stand sheet.
+
+    Reads the current Column A, compares it against the expected category/item
+    order, and inserts any missing items or category headers in the correct
+    alphabetically-sorted position within their category.
+
+    Rules
+    -----
+    * Only Column A is modified — week-data columns (B onward) are untouched.
+    * Existing rows are never deleted, moved, or reformatted.
+    * The operation is idempotent: running it twice adds 0 items the second time.
+    * New category headers get the same light-blue bold formatting as existing ones.
+    * New item rows get plain white formatting.
+
+    Returns
+    -------
+    dict with keys:
+        "added"   – list of item/header names that were inserted
+        "skipped" – list of item names that already existed in Column A
+    """
+    # -- Build expected category order (same logic as write_full_week) --
+    master_items = read_master_items(sheet, spreadsheet_id, stand_name)
+    if master_items:
+        from collections import OrderedDict as _OD
+        _category_map = _OD()
+        for _cat, _itm in master_items:
+            _category_map.setdefault(_cat, []).append(_itm)
+        category_order = list(_category_map.items())
+    else:
+        category_order = get_default_category_order_for_stand(stand_name)
+
+    # -- Read current Column A --
+    existing_map = read_item_row_map(sheet, spreadsheet_id, stand_name)
+
+    # -- Get integer sheet ID for batchUpdate calls --
+    sheet_id = get_sheet_id(service, spreadsheet_id, stand_name)
+
+    # -- Build the list of rows that need to be inserted --
+    # Each entry: (anchor_row_1based, sort_key_tuple, item_name, is_header)
+    # "anchor_row" is the 1-based row after which the new row will be inserted.
+    insertions = []
+    added = []
+    skipped = []
+
+    # Walk the expected structure top-to-bottom, tracking the last row we've
+    # seen in the *existing* sheet so we know where to anchor insertions.
+    last_known_row = SUBHEADER_ROW  # row 2; data starts at row 3
+
+    for cat_idx, (category_name, item_list) in enumerate(category_order):
+        sorted_items = sorted(item_list)
+
+        if category_name in existing_map:
+            last_known_row = existing_map[category_name]
+            item_anchor = existing_map[category_name]
+        else:
+            # Category header is missing.  Anchor it (and its items) after the
+            # last row we've seen so far.  When processed bottom-to-top the
+            # header will be inserted last within its group, ending up directly
+            # after last_known_row with all its items following.
+            cat_anchor = last_known_row
+            insertions.append((cat_anchor, (cat_idx, -1), category_name, True))
+            added.append(category_name)
+            item_anchor = last_known_row
+
+        for item_idx, item in enumerate(sorted_items):
+            if item in existing_map:
+                skipped.append(item)
+                last_known_row = existing_map[item]
+                item_anchor = existing_map[item]
+            else:
+                # Insert this item after the nearest predecessor that exists.
+                insertions.append((item_anchor, (cat_idx, item_idx), item, False))
+                added.append(item)
+                # item_anchor is intentionally NOT updated for missing items so
+                # that subsequent missing items in this category also anchor off
+                # the same row.  When sorted descending and processed one by one
+                # they naturally accumulate in the correct sorted order.
+
+    if not insertions:
+        return {"added": [], "skipped": skipped}
+
+    # -- Sort insertions bottom-to-top so earlier inserts don't shift later ones --
+    # Primary sort: anchor_row descending (process lowest row last).
+    # Secondary sort: sort_key descending (within equal anchors, process later
+    # expected items first so the header ends up on top after all inserts).
+    insertions.sort(key=lambda x: (x[0], x[1][0], x[1][1]), reverse=True)
+
+    # -- Execute each insertion --
+    for anchor_row, _sort_key, item_name, is_header in insertions:
+        # Insert one blank row immediately after anchor_row.
+        # insertDimension.startIndex is 0-based; startIndex=anchor_row inserts
+        # before 0-based row anchor_row (= 1-based row anchor_row+1), which is
+        # directly after 1-based row anchor_row.
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"requests": [{
+                "insertDimension": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": anchor_row,
+                        "endIndex": anchor_row + 1,
+                    },
+                    "inheritFromBefore": False,
+                }
+            }]},
+        ).execute()
+
+        new_row_1based = anchor_row + 1
+
+        # Write the item/header name into Column A of the new row.
+        service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range=f"'{stand_name}'!A{new_row_1based}",
+            valueInputOption="RAW",
+            body={"values": [[item_name]]},
+        ).execute()
+
+        # Apply formatting: light-blue bold for category headers, plain for items.
+        if is_header:
+            cell_format = {
+                "backgroundColor": {"red": 0.647, "green": 0.761, "blue": 0.902},
+                "textFormat": {"bold": True},
+            }
+        else:
+            cell_format = {
+                "backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0},
+                "textFormat": {"bold": False},
+            }
+
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"requests": [{
+                "repeatCell": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": new_row_1based - 1,
+                        "endRowIndex": new_row_1based,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 1,
+                    },
+                    "cell": {"userEnteredFormat": cell_format},
+                    "fields": "userEnteredFormat(backgroundColor,textFormat)",
+                }
+            }]},
+        ).execute()
+
+    return {"added": added, "skipped": skipped}
+
+
 def connect_to_sheets():
     creds = Credentials.from_service_account_file(
         r"C:\Users\willi\OneDrive\Desktop\inventory_Script\Credentials-personal.json",

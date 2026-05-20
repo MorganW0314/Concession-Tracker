@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import ttk, font as tkfont
 
 from Take_items import take_items, take_modifiers   # your CSV ingestion functions
-from Call_sheets import write_full_week, write_modifier_sales_to_week
+from Call_sheets import write_full_week, write_modifier_sales_to_week, sync_stand_item_list
 from email_summary import send_summary_email
 from googleapiclient.discovery import build # type: ignore
 from google.oauth2.service_account import Credentials
@@ -167,6 +167,22 @@ class ConcessionApp(tk.Tk):
         )
         self._run_btn.pack(side="left")
 
+        self._sync_btn = tk.Button(
+            btn_frame,
+            text="🔄 Sync Item List",
+            font=self._font_btn,
+            bg="#2a6b6b",
+            fg="white",
+            activebackground="#235959",
+            activeforeground="white",
+            relief="flat",
+            padx=24,
+            pady=8,
+            cursor="hand2",
+            command=self._on_sync,
+        )
+        self._sync_btn.pack(side="left", padx=(10, 0))
+
         self._email_btn = tk.Button(
             btn_frame,
             text="📧 Send Summary Email",
@@ -263,12 +279,14 @@ class ConcessionApp(tk.Tk):
 
     def _disable_controls(self):
         self._run_btn.config(state="disabled")
+        self._sync_btn.config(state="disabled")
         self._email_btn.config(state="disabled")
         self._stand_combo.config(state="disabled")
         self._csv_combo.config(state="disabled")
 
     def _enable_controls(self):
         self._run_btn.config(state="normal")
+        self._sync_btn.config(state="normal")
         self._email_btn.config(state="normal")
         self._stand_combo.config(state="readonly")
         self._csv_combo.config(state="readonly")
@@ -361,6 +379,66 @@ class ConcessionApp(tk.Tk):
         self._set_status("⏳ Sending summary email…", "#1a3a6b")
         self._log("Sending weekly inventory summary email…")
         threading.Thread(target=self._send_email_thread, daemon=True).start()
+
+    # ----------------------------------------------------------
+    # SYNC ITEM LIST handler
+    # ----------------------------------------------------------
+    def _on_sync(self):
+        stand_name = self._stand_var.get().strip()
+        if not stand_name:
+            self._set_status("⚠  Please select a stand.", "#c0392b")
+            return
+
+        self._disable_controls()
+        self._set_status("⏳ Syncing item list…", "#2a6b6b")
+        self._log(f"Syncing item list for: {stand_name}")
+
+        threading.Thread(
+            target=self._sync_thread,
+            args=(stand_name,),
+            daemon=True,
+        ).start()
+
+    def _sync_thread(self, stand_name):
+        """Background thread: authenticate and run sync_stand_item_list."""
+        try:
+            self._log("Authenticating with Google Sheets…")
+            creds = Credentials.from_service_account_file(
+                CREDENTIALS_PATH,
+                scopes=["https://www.googleapis.com/auth/spreadsheets"],
+            )
+            service = build("sheets", "v4", credentials=creds)
+            sheet = service.spreadsheets()
+
+            self._log("Comparing item list against Column A…")
+            result = sync_stand_item_list(sheet, service, SPREADSHEET_ID, stand_name)
+
+            added = result.get("added", [])
+            skipped = result.get("skipped", [])
+
+            if added:
+                for item in added:
+                    self._log(f"  + Added: {item}")
+            else:
+                self._log("  No new items to add — sheet is already up to date.")
+
+            self._log(f"Sync complete: {len(added)} added, {len(skipped)} already present.")
+            self.after(0, self._on_sync_success, len(added))
+
+        except Exception:
+            logging.getLogger(__name__).error("Sync failed:", exc_info=True)
+            self.after(0, self._on_sync_error)
+
+    def _on_sync_success(self, n_added):
+        self._append_log(
+            f"\n✅  Sync complete — {n_added} item(s) added.", "SUCCESS"
+        )
+        self._set_status(f"✅ Sync complete — {n_added} items added.", "#2a6b6b")
+        self._enable_controls()
+
+    def _on_sync_error(self):
+        self._set_status("❌ Sync failed — check log.", "#c0392b")
+        self._enable_controls()
 
     def _send_email_thread(self):
         try:
