@@ -147,7 +147,9 @@ def _format_quantity(value: float) -> str:
 
 def _format_expected_line(item: str, expected: float, category: str) -> str:
     if category == "ICE_CREAM_TOFTS":
-        qty_text = f"{expected:.2f} tubs expected"
+        from Call_sheets import SCOOPS_PER_TUB
+        tubs = expected / SCOOPS_PER_TUB
+        qty_text = f"{tubs:.2f} tubs expected"
     elif category == "FOUNTAIN_DRINKS":
         qty_text = f"{_format_quantity(expected)} oz expected"
     else:
@@ -177,6 +179,8 @@ def generate_email_body(
     stand_rows: Dict[str, List[dict]] | None = None,
     week_label: str | None = None,
 ) -> str:
+    from Call_sheets import SCOOPS_PER_TUB
+
     stand_names = list(stand_names)
     stand_rows = stand_rows or {}
     stands_status = get_stands_with_discrepancies(stand_names, negative_items)
@@ -225,8 +229,13 @@ def generate_email_body(
                 expected_line = _format_expected_line(row["item"], row["expected"], category)
                 actual = row.get("actual")
                 if actual is not None and actual < row["expected"]:
-                    variance = actual - row["expected"]
-                    expected_line += f"  ⚠️  Variance: {variance:.2f}"
+                    # For ice cream, convert scoops → tubs for the variance display too
+                    if category == "ICE_CREAM_TOFTS":
+                        variance_tubs = (actual - row["expected"]) / SCOOPS_PER_TUB
+                        expected_line += f"  ⚠️  Variance: {variance_tubs:.2f} tubs"
+                    else:
+                        variance = actual - row["expected"]
+                        expected_line += f"  ⚠️  Variance: {variance:.2f}"
                 lines.append(expected_line)
 
     return "\n".join(lines)
@@ -253,6 +262,10 @@ def send_summary_email(
     if not smtp_host or not sender or not recipient:
         return False
 
+    # Support comma-separated list of recipients
+    # e.g. CONCESSION_EMAIL_RECIPIENT=you@gmail.com,manager@gmail.com
+    recipients = [r.strip() for r in recipient.split(",") if r.strip()]
+
     stand_names = list(stand_names)
     stand_rows = {stand_name: _read_latest_week_rows(sheet, spreadsheet_id, stand_name) for stand_name in stand_names}
     negative_items = {stand_name: _negative_from_rows(rows) for stand_name, rows in stand_rows.items()}
@@ -263,7 +276,7 @@ def send_summary_email(
     message = EmailMessage()
     message["Subject"] = f"Concession Tracker - Weekly Inventory Summary ({week_label})"
     message["From"] = sender
-    message["To"] = recipient
+    message["To"] = ", ".join(recipients)
     message.set_content(body)
 
     try:
