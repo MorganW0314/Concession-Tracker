@@ -263,7 +263,10 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
             os.unlink(path)
 
     def test_missing_file_returns_empty_dict(self):
-        result = take_modifiers("/tmp/nonexistent_modifier_file_xyz.csv")
+        missing_path = os.path.join(
+            tempfile.gettempdir(), "nonexistent_modifier_file_xyz.csv"
+        )
+        result = take_modifiers(missing_path)
         self.assertEqual(result, {})
 
 
