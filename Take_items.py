@@ -16,6 +16,7 @@ COMBO_BREAKDOWN = {
 
 MODIFIER_ITEMS = {
     "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow", "Gatorade - Orange"],
+    "Single Dip": [],
     # Add more items here as we scale beyond prototype
 }
 
