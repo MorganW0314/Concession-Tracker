@@ -1622,7 +1622,7 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Popcorn": {"TREMONT", "REED ROAD", "NWSC"},
     "Bloom Pop - Strawberry Cream":    {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
     "Bloom Pop - Raspberry Lemonade":  {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
-    "Bloom Pop - Watermelon Lime":     {"Bevelhymer Green", "Bevelhymer", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
+    "Bloom Pop - Watermelon Lime":     {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
 }
 
 
