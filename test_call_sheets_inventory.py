@@ -110,6 +110,12 @@ class InventoryRefactorTests(unittest.TestCase):
             {"TREMONT", "REED ROAD", "NWSC"},
         )
 
+    def test_bloom_pop_locations_use_canonical_bevelhymer_name(self):
+        self.assertIn("Bloom Pop - Watermelon Lime", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
+        stands = Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Bloom Pop - Watermelon Lime"]
+        self.assertIn("Bevelhymer Yellow", stands)
+        self.assertNotIn("Bevelhymer", stands)
+
     def test_consolidate_variants_initializes_full_base_row_shape(self):
         rows = {"Vanilla Double Scoop": {"sales": 2, "deliveries": 3, "spoilage": 1}}
         Call_sheets.consolidate_variants_to_base(rows, {"Vanilla Double Scoop": "Vanilla"})
