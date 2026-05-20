@@ -1,7 +1,7 @@
 import sys
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, call, patch
 
 
 def _install_google_stubs():
@@ -207,6 +207,228 @@ class InventoryRefactorTests(unittest.TestCase):
         with patch.object(Call_sheets, "get_values", side_effect=[header, hot_dog_rows]):
             reed_hot_dogs = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_hot_dogs["Hot Dogs"], 1998)
+
+
+# ---------------------------------------------------------------------------
+# Helper to build a minimal fake Google Sheets service for sync tests
+# ---------------------------------------------------------------------------
+
+def _make_service(sheet_id=42):
+    """Return a MagicMock service where spreadsheets().get() returns sheet_id."""
+    service = MagicMock()
+
+    # get_sheet_id calls service.spreadsheets().get(spreadsheetId=...).execute()
+    metadata_resp = {
+        "sheets": [{"properties": {"title": "Test Stand", "sheetId": sheet_id}}]
+    }
+    service.spreadsheets.return_value.get.return_value.execute.return_value = metadata_resp
+
+    # batchUpdate → execute returns a non-error value
+    service.spreadsheets.return_value.batchUpdate.return_value.execute.return_value = {}
+
+    # values().update().execute()
+    service.spreadsheets.return_value.values.return_value.update.return_value.execute.return_value = {}
+
+    return service
+
+
+class SyncStandItemListTests(unittest.TestCase):
+    """Unit tests for sync_stand_item_list()."""
+
+    STAND = "Test Stand"
+    SPREADSHEET_ID = "fake-id"
+
+    def _make_sheet(self, col_a_values):
+        """Return a mock sheet where values().get().execute() yields col_a_values.
+
+        col_a_values is a list of row lists, e.g. [["ITEM"], [""], ["CAT"], ["item1"]].
+        read_master_items (which also calls sheet.values().get()) is patched out
+        separately to return None (no master tab) so the default category order
+        is used.
+        """
+        sheet = MagicMock()
+        sheet.values.return_value.get.return_value.execute.return_value = {
+            "values": col_a_values
+        }
+        return sheet
+
+    # ------------------------------------------------------------------ #
+    # Test: nothing to add when sheet already has all expected items       #
+    # ------------------------------------------------------------------ #
+    def test_idempotent_no_changes_needed(self):
+        """Running sync when all items are present returns added=[]."""
+        # Build a minimal category order with two categories and two items each.
+        category_order = [
+            ("CAT_A", ["Apple", "Banana"]),
+            ("CAT_B", ["Cherry", "Date"]),
+        ]
+        # Column A: row1=ITEM, row2=blank, row3=CAT_A, row4=Apple, row5=Banana,
+        #           row6=CAT_B, row7=Cherry, row8=Date
+        col_a = [
+            ["ITEM"], [""],
+            ["CAT_A"], ["Apple"], ["Banana"],
+            ["CAT_B"], ["Cherry"], ["Date"],
+        ]
+        sheet = self._make_sheet(col_a)
+        service = _make_service()
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand",
+                         return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(result["added"], [])
+        self.assertCountEqual(
+            result["skipped"], ["Apple", "Banana", "Cherry", "Date"]
+        )
+        # No insertions should have been made.
+        service.spreadsheets.return_value.batchUpdate.assert_not_called()
+
+    # ------------------------------------------------------------------ #
+    # Test: new item inserted into an existing category                    #
+    # ------------------------------------------------------------------ #
+    def test_new_item_inserted_in_existing_category(self):
+        """A single new item is added to an existing category."""
+        category_order = [("CAT_A", ["Apple", "Banana", "Cherry"])]
+        # Sheet is missing "Cherry"
+        col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["Banana"]]
+        sheet = self._make_sheet(col_a)
+        service = _make_service()
+
+        inserted_rows = []
+
+        def capture_batch(spreadsheetId, body):
+            req = body["requests"][0]
+            if "insertDimension" in req:
+                inserted_rows.append(req["insertDimension"]["range"]["startIndex"])
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand",
+                         return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(result["added"], ["Cherry"])
+        # One insertDimension should have been called.
+        self.assertEqual(len(inserted_rows), 1)
+        # Cherry comes after Banana (row 5, 1-based), so startIndex should be 5.
+        self.assertEqual(inserted_rows[0], 5)
+
+    # ------------------------------------------------------------------ #
+    # Test: multiple new items maintain alphabetical order                 #
+    # ------------------------------------------------------------------ #
+    def test_multiple_new_items_correct_order(self):
+        """Items inserted into a category end up in sorted order."""
+        category_order = [("CAT_A", ["Apple", "Banana", "Cherry", "Date"])]
+        # Sheet has only Apple and Date; Banana and Cherry are missing.
+        # Apple=row3 (header=row3 wait, let me re-count)
+        # row1=ITEM, row2=blank, row3=CAT_A, row4=Apple, row5=Date
+        col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["Date"]]
+        sheet = self._make_sheet(col_a)
+        service = _make_service()
+
+        inserted_rows = []
+
+        def capture_batch(spreadsheetId, body):
+            req = body["requests"][0]
+            if "insertDimension" in req:
+                inserted_rows.append(req["insertDimension"]["range"]["startIndex"])
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand",
+                         return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertCountEqual(result["added"], ["Banana", "Cherry"])
+        self.assertCountEqual(result["skipped"], ["Apple", "Date"])
+        # Two insertDimension calls (one per missing item).
+        self.assertEqual(len(inserted_rows), 2)
+
+    # ------------------------------------------------------------------ #
+    # Test: missing category header is also inserted                       #
+    # ------------------------------------------------------------------ #
+    def test_missing_category_header_inserted(self):
+        """A whole new category (header + items) is inserted."""
+        category_order = [
+            ("CAT_A", ["Apple"]),
+            ("CAT_B", ["Cherry"]),   # entirely new category
+        ]
+        col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"]]
+        sheet = self._make_sheet(col_a)
+        service = _make_service()
+
+        inserted_rows = []
+
+        def capture_batch(spreadsheetId, body):
+            req = body["requests"][0]
+            if "insertDimension" in req:
+                inserted_rows.append(req["insertDimension"]["range"]["startIndex"])
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand",
+                         return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        # Both the header and the item should be added.
+        self.assertIn("CAT_B", result["added"])
+        self.assertIn("Cherry", result["added"])
+        self.assertEqual(len(result["added"]), 2)
+        # Two insertDimension calls.
+        self.assertEqual(len(inserted_rows), 2)
+
+    # ------------------------------------------------------------------ #
+    # Test: return value has correct structure                             #
+    # ------------------------------------------------------------------ #
+    def test_return_value_structure(self):
+        """sync_stand_item_list always returns a dict with added/skipped keys."""
+        category_order = [("CAT_A", ["Apple"])]
+        col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"]]
+        sheet = self._make_sheet(col_a)
+        service = _make_service()
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand",
+                         return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertIn("added", result)
+        self.assertIn("skipped", result)
+        self.assertIsInstance(result["added"], list)
+        self.assertIsInstance(result["skipped"], list)
 
 
 if __name__ == "__main__":
