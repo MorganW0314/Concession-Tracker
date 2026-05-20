@@ -63,7 +63,8 @@ class ModifierItemsConstantTests(unittest.TestCase):
             "Brownie Bandit Single Scoop", "Brownie Bandit Double Scoop", "Brownie Bandit Triple Scoop",
             "Cookie Monster Single Scoop", "Cookie Monster Double Scoop", "Cookie Monster Triple Scoop",
             "Vanilla Single Scoop", "Vanilla Double Scoop", "Vanilla Triple Scoop",
-            "Rainbow Sherbert",  # backward-compat spelling
+            # Backward-compatible CSV misspelling ("Sherbert" not "Sherbet") from POS exports
+            "Rainbow Sherbert",
         ):
             self.assertIn(variant, _TOFTS_ICE_CREAM_SKIP_ITEMS)
 
