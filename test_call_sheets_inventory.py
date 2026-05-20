@@ -321,7 +321,6 @@ class SyncStandItemListTests(unittest.TestCase):
             )
 
         self.assertEqual(result["added"], ["Cherry"])
-        self.assertIn("Cherry", result["added"])
         # One insertDimension should have been called.
         self.assertEqual(len(inserted_rows), 1)
         # Cherry comes after Banana (row 5, 1-based), so startIndex should be 5.
