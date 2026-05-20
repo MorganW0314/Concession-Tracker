@@ -16,6 +16,7 @@ COMBO_BREAKDOWN = {
 
 MODIFIER_ITEMS = {
     "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow", "Gatorade - Orange"],
+    "Single Dip": [],   # ice cream — flavors come from modifier CSV
     "Double Dip": [],   # ice cream — flavors come from modifier CSV
     "Triple Dip": [],   # ice cream — flavors come from modifier CSV
     # Ice Cream Flavor 1/2/3 modifier sets — the modifier value IS the flavor name

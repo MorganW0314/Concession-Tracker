@@ -1,7 +1,4 @@
-"""Unit tests for Take_items.py — item-sales and modifier-sales CSV parsing."""
-
 import csv
-import io
 import os
 import tempfile
 import unittest
@@ -84,6 +81,21 @@ class TakeItemsSkipTests(unittest.TestCase):
             self.assertNotIn("Double Dip", result)
             self.assertIn("Hot Dog", result)
             self.assertEqual(result["Hot Dog"]["sales"], 5)
+        finally:
+            os.unlink(path)
+
+    def test_single_dip_skipped(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Single Dip", "Item Variation": "Regular",
+             "Units Sold": "3", "Units Refunded": "0"},
+            {"Item Name": "Hot Dog", "Item Variation": "Regular",
+             "Units Sold": "2", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertNotIn("Single Dip", result)
+            self.assertIn("Hot Dog", result)
+            self.assertEqual(result["Hot Dog"]["sales"], 2)
         finally:
             os.unlink(path)
 
@@ -251,7 +263,10 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
             os.unlink(path)
 
     def test_missing_file_returns_empty_dict(self):
-        result = take_modifiers("/tmp/nonexistent_modifier_file_xyz.csv")
+        missing_path = os.path.join(
+            tempfile.gettempdir(), "nonexistent_modifier_file_xyz.csv"
+        )
+        result = take_modifiers(missing_path)
         self.assertEqual(result, {})
 
 
