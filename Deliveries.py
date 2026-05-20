@@ -1,5 +1,5 @@
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
+from googleapiclient.discovery import build # type: ignore
 
 SPREADSHEET_ID = "YOUR_SHEET_ID"
 DELIVERIES_RANGE = "Deliveries!A:C"  # Date, Item, Quantity

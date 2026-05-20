@@ -1438,6 +1438,7 @@ CANDY = [
     "Starburst",
     "Nerds Clusters",
     "Cotton Candy",
+    "Cowtails",
 ]
 
 FOUNTAIN_DRINKS = [
@@ -1463,6 +1464,9 @@ BOTTLED_DRINKS = [
     "Bloom Pop - Strawberry Cream",
     "Bloom Pop - Raspberry Lemonade",
     "Bloom Pop - Watermelon Lime",
+    "Poppi - Watermelon",
+    "Poppi - Wild Berry",
+    "Poppi -Raspberry Rose ",
     "Fairlife Protein",
     "La Colombe - Vanilla",
     "La Colombe - Mocha",
@@ -1612,7 +1616,13 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Diet Pepsi": {"PTAC"},
     "Pepsi": {"PTAC"},
     "Starry": {"PTAC"},
+    "Poppi - Watermelon": {"PTAC"},
+    "Poppi - Wild Berry": {"PTAC"},
+    "Poppi - Raspberry Rose ": {"PTAC"},
     "Popcorn": {"TREMONT", "REED ROAD", "NWSC"},
+    "Bloom Pop - Strawberry Cream":    {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
+    "Bloom Pop - Raspberry Lemonade":  {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
+    "Bloom Pop - Watermelon Lime":     {"Bevelhymer Green", "Bevelhymer", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
 }
 
 
