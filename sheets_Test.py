@@ -7,6 +7,7 @@ from tkinter import ttk, font as tkfont
 
 from Take_items import take_items, take_modifiers   # your CSV ingestion functions
 from Call_sheets import write_full_week, write_modifier_sales_to_week
+from email_summary import send_summary_email
 from googleapiclient.discovery import build # type: ignore
 from google.oauth2.service_account import Credentials
 
@@ -166,6 +167,22 @@ class ConcessionApp(tk.Tk):
         )
         self._run_btn.pack(side="left")
 
+        self._email_btn = tk.Button(
+            btn_frame,
+            text="📧 Send Summary Email",
+            font=self._font_btn,
+            bg="#1a3a6b",
+            fg="white",
+            activebackground="#17315a",
+            activeforeground="white",
+            relief="flat",
+            padx=24,
+            pady=8,
+            cursor="hand2",
+            command=self._on_send_summary_email,
+        )
+        self._email_btn.pack(side="left", padx=(10, 0))
+
         self._status_label = tk.Label(
             btn_frame,
             text="",
@@ -244,6 +261,18 @@ class ConcessionApp(tk.Tk):
     def _set_status(self, msg, color="#444"):
         self._status_label.config(text=msg, fg=color)
 
+    def _disable_controls(self):
+        self._run_btn.config(state="disabled")
+        self._email_btn.config(state="disabled")
+        self._stand_combo.config(state="disabled")
+        self._csv_combo.config(state="disabled")
+
+    def _enable_controls(self):
+        self._run_btn.config(state="normal")
+        self._email_btn.config(state="normal")
+        self._stand_combo.config(state="readonly")
+        self._csv_combo.config(state="readonly")
+
     # ----------------------------------------------------------
     # RUN handler
     # ----------------------------------------------------------
@@ -261,9 +290,7 @@ class ConcessionApp(tk.Tk):
         csv_file = self._csv_files[csv_index]
 
         # Disable controls during processing
-        self._run_btn.config(state="disabled")
-        self._stand_combo.config(state="disabled")
-        self._csv_combo.config(state="disabled")
+        self._disable_controls()
         self._set_status("⏳  Running…", "#1a6b3a")
 
         # Clear previous log
@@ -329,18 +356,54 @@ class ConcessionApp(tk.Tk):
             logging.getLogger(__name__).error("Processing failed:", exc_info=True)
             self.after(0, self._on_error)
 
+    def _on_send_summary_email(self):
+        self._disable_controls()
+        self._set_status("⏳ Sending summary email…", "#1a3a6b")
+        self._log("Sending weekly inventory summary email…")
+        threading.Thread(target=self._send_email_thread, daemon=True).start()
+
+    def _send_email_thread(self):
+        try:
+            self._log("Authenticating with Google Sheets…")
+            creds = Credentials.from_service_account_file(
+                CREDENTIALS_PATH,
+                scopes=["https://www.googleapis.com/auth/spreadsheets"],
+            )
+            service = build("sheets", "v4", credentials=creds)
+            sheet = service.spreadsheets()
+
+            sent = send_summary_email(
+                sheet,
+                SPREADSHEET_ID,
+                STANDS,
+            )
+            if sent:
+                self._log("Summary email sent successfully.", "SUCCESS")
+                self.after(0, self._on_email_success)
+            else:
+                self._log("Summary email failed to send.", "ERROR")
+                self.after(0, self._on_email_error)
+        except Exception:
+            logging.getLogger(__name__).error("Summary email failed:", exc_info=True)
+            self._log("Summary email failed — check log.", "ERROR")
+            self.after(0, self._on_email_error)
+
     def _on_success(self, stand_name):
         self._append_log(f"\n✅  Success!  Week written to '{stand_name}' tab.", "SUCCESS")
         self._set_status(f"✅  Done — check the {stand_name} tab!", "#1a6b3a")
-        self._run_btn.config(state="normal")
-        self._stand_combo.config(state="readonly")
-        self._csv_combo.config(state="readonly")
+        self._enable_controls()
 
     def _on_error(self):
         self._set_status("❌  Error — see log above.", "#c0392b")
-        self._run_btn.config(state="normal")
-        self._stand_combo.config(state="readonly")
-        self._csv_combo.config(state="readonly")
+        self._enable_controls()
+
+    def _on_email_success(self):
+        self._set_status("✅ Summary email sent!", "#1a6b3a")
+        self._enable_controls()
+
+    def _on_email_error(self):
+        self._set_status("❌ Email failed — check log.", "#c0392b")
+        self._enable_controls()
 
 
 # ------------------------------------------------------------
@@ -349,4 +412,3 @@ class ConcessionApp(tk.Tk):
 if __name__ == "__main__":
     app = ConcessionApp()
     app.mainloop()
-
