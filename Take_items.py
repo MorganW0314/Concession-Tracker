@@ -16,8 +16,47 @@ COMBO_BREAKDOWN = {
 
 MODIFIER_ITEMS = {
     "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow", "Gatorade - Orange"],
-    # Add more items here as we scale beyond prototype
+    "Double Dip": [],   # ice cream — flavors come from modifier CSV
+    "Triple Dip": [],   # ice cream — flavors come from modifier CSV
+    # Ice Cream Flavor 1/2/3 modifier sets — the modifier value IS the flavor name
+    "Ice Cream Flavor": [],
 }
+
+# Prefix used for Toft's ice cream modifier set names in the modifier CSV
+# (e.g. "Ice Cream Flavor 1", "Ice Cream Flavor 2", "Ice Cream Flavor 3").
+# When a modifier set name contains this prefix the modifier value is used
+# directly as the item name rather than being prefixed with the set name.
+ICE_CREAM_FLAVOR_SET_PREFIX = "Ice Cream Flavor"
+
+# All Toft's ice cream item names that may appear in the item-sales CSV.
+# These are skipped in take_items() because ice cream is now tracked entirely
+# via the modifier-sales CSV (Double Dip / Triple Dip base items feed into
+# Ice Cream Flavor 1/2/3 modifier sets).  Mirrors TOFTS_ICE_CREAM from
+# Call_sheets.py — keep in sync when new scoop variants are added.
+_TOFTS_ICE_CREAM_SKIP_ITEMS: frozenset = frozenset({
+    # Base flavors
+    "Brownie Bandit", "Birthday Cake", "Chocolate", "Cookie Dough",
+    "Cookie Monster", "Cookies n' Cream", "Vanilla", "Cotton Candy Ice Cream",
+    "Mint Chip", "Rainbow Sherbet", "PB S'Mores", "Blueberry Waffle Cone",
+    # Scoop variants
+    "Brownie Bandit Single Scoop", "Brownie Bandit Double Scoop", "Brownie Bandit Triple Scoop",
+    "Birthday Cake Single Scoop", "Birthday Cake Double Scoop", "Birthday Cake Triple Scoop",
+    "Chocolate Single Scoop", "Chocolate Double Scoop", "Chocolate Triple Scoop",
+    "Cookie Dough Single Scoop", "Cookie Dough Double Scoop", "Cookie Dough Triple Scoop",
+    "Cookie Monster Single Scoop", "Cookie Monster Double Scoop", "Cookie Monster Triple Scoop",
+    "Cookies n' Cream Single Scoop", "Cookies n' Cream Double Scoop", "Cookies n' Cream Triple Scoop",
+    "Cookies N Cream", "Cookies N Cream Single Scoop", "Cookies N Cream Double Scoop", "Cookies N Cream Triple Scoop",
+    "Cookies & Cream", "Cookies & Cream Single Scoop", "Cookies & Cream Double Scoop", "Cookies & Cream Triple Scoop",
+    "Cotton Candy Single Scoop", "Cotton Candy Double Scoop", "Cotton Candy Triple Scoop",
+    "Cotton Candy Ice Cream Single Scoop", "Cotton Candy Ice Cream Double Scoop", "Cotton Candy Ice Cream Triple Scoop",
+    "Mint Chip Single Scoop", "Mint Chip Double", "Mint Chip Double Scoop", "Mint Chip Triple Scoop",
+    "Rainbow Sherbet Single Scoop", "Rainbow Sherbet Double Scoop", "Rainbow Sherbet Triple Scoop",
+    # Backward-compatible CSV spelling variant (common misspelling in POS exports)
+    "Rainbow Sherbert", "Rainbow Sherbert Single Scoop", "Rainbow Sherbert Double Scoop", "Rainbow Sherbert Triple Scoop",
+    "PB S'Mores Single Scoop", "PB S'Mores Double Scoop", "PB S'Mores Triple Scoop",
+    "Blueberry Waffle Cone Single Scoop", "Blueberry Waffle Cone Double Scoop", "Blueberry Waffle Cone Triple Scoop",
+    "Vanilla Single Scoop", "Vanilla Double Scoop", "Vanilla Triple Scoop",
+})
 
 _logger = _make_logger("concession.Take_items")
 
@@ -106,6 +145,18 @@ def take_items(csv_file_path, stand_name=None):
                 skipped_rows += 1
                 continue
 
+            # Skip legacy Toft's ice cream scoop variants — ice cream is now
+            # tracked entirely via the modifier-sales CSV (Ice Cream Flavor
+            # 1/2/3 modifier sets).  Base items ("Double Dip", "Triple Dip")
+            # are already skipped above via MODIFIER_ITEMS.
+            if item in _TOFTS_ICE_CREAM_SKIP_ITEMS:
+                _logger.debug(
+                    "⏭️  Skipping legacy ice cream item %r — tracked via modifier CSV",
+                    item,
+                )
+                skipped_rows += 1
+                continue
+
             if item in COMBO_BREAKDOWN:
                 for comp in COMBO_BREAKDOWN[item]:
                     if comp not in rows:
@@ -159,13 +210,28 @@ def take_items(csv_file_path, stand_name=None):
 def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stand_name=None):
     """Parse a Square modifier CSV export and return a dict of modifier item sales.
 
-    CSV format:
-        Modifier Set,Modifier,<date-range column(s)...>
+    Supports two CSV layouts:
 
-    The item name is constructed by finding which MODIFIER_ITEMS key is contained
-    in the Modifier Set value (e.g. "Gatorade Flavor" contains "Gatorade"), then
-    combining that key with the Modifier value (e.g. "Gatorade" + "Blue" →
-    "Gatorade Blue").
+    Date-range layout (Gatorade):
+        Modifier Set,Modifier,<date-range column(s)...>
+        e.g. "Gatorade Flavor,Blue,3"
+
+    Qty-Sold layout (Ice Cream):
+        Modifier Set,Modifier,Qty Sold,Gross Sales
+        e.g. "Ice Cream Flavor 1,Cookie Monster,2,$0.00"
+
+    All columns other than "Modifier Set" and "Modifier" are treated as
+    quantity columns and summed.  Dollar-prefixed values (e.g. "$0.00") are
+    stripped of the leading "$" and contribute 0 after rounding, so the
+    "Gross Sales" column in the ice cream CSV is safely ignored.
+
+    Item-name construction:
+    - For regular modifier sets (e.g. "Gatorade Flavor"):
+        "{base_name} {modifier}"  →  "Gatorade Blue"
+    - For ice cream flavor sets (modifier set contains ICE_CREAM_FLAVOR_SET_PREFIX):
+        "{modifier}"  →  "Cookie Monster"
+      Quantities are accumulated across all Ice Cream Flavor N sets so that
+      the same flavor appearing in Flavor 1, Flavor 2, and Flavor 3 is summed.
 
     Args:
         csv_file_path:   Absolute path to the modifier CSV file.
@@ -200,7 +266,9 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
             ]
             reader.fieldnames = fieldnames
 
-            # Date columns are every column after "Modifier Set" and "Modifier"
+            # All columns after "Modifier Set" and "Modifier" are quantity
+            # columns (date ranges for Gatorade; "Qty Sold"/"Gross Sales" for
+            # ice cream).  Dollar-prefixed values round to 0 and are harmless.
             date_columns = [
                 fn for fn in fieldnames
                 if fn not in ("Modifier Set", "Modifier")
@@ -208,11 +276,11 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
 
             if not date_columns:
                 _logger.warning(
-                    "Modifier CSV has no date columns: %s", csv_file_path
+                    "Modifier CSV has no quantity columns: %s", csv_file_path
                 )
                 return {}
 
-            _logger.debug("Modifier CSV date columns: %s", date_columns)
+            _logger.debug("Modifier CSV quantity columns: %s", date_columns)
 
             for line in reader:
                 modifier_set = (line.get("Modifier Set") or "").strip()
@@ -237,9 +305,17 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                     )
                     continue
 
-                item_name = f"{base_name} {modifier}"
+                # For ice cream flavor sets (e.g. "Ice Cream Flavor 1"),
+                # the modifier value IS the flavor name.  Quantities from
+                # Flavor 1, Flavor 2, and Flavor 3 are summed into one entry.
+                # For all other modifier sets (e.g. "Gatorade Flavor"),
+                # the item name is "{base_name} {modifier}".
+                if ICE_CREAM_FLAVOR_SET_PREFIX in modifier_set:
+                    item_name = modifier
+                else:
+                    item_name = f"{base_name} {modifier}"
 
-                # Sum quantities across all date columns
+                # Sum quantities across all quantity/date columns
                 total_qty = 0
                 for col in date_columns:
                     raw = (line.get(col) or "").strip()
@@ -256,12 +332,16 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                             raw, item_name, col,
                         )
 
-                rows[item_name] = {
-                    "starting": 0,
-                    "deliveries": 0,
-                    "sales": total_qty,
-                    "spoilage": 0,
-                }
+                # Accumulate sales — the same flavor can appear in multiple
+                # modifier sets (Ice Cream Flavor 1, 2, 3) and must be summed.
+                if item_name not in rows:
+                    rows[item_name] = {
+                        "starting": 0,
+                        "deliveries": 0,
+                        "sales": 0,
+                        "spoilage": 0,
+                    }
+                rows[item_name]["sales"] += total_qty
                 _logger.debug("Modifier item: %r → sales=%d", item_name, total_qty)
 
     except Exception as exc:
