@@ -262,7 +262,7 @@ class InventoryRefactorTests(unittest.TestCase):
         service = MagicMock()
         with (
             patch.object(Call_sheets, "find_last_week_start_col", return_value=1),
-            patch.object(Call_sheets, "read_item_row_map", return_value={"Slushie - Mango": 5}),
+            patch.object(Call_sheets, "read_item_row_map", return_value={"slushie - mango": 5}),
         ):
             Call_sheets.write_modifier_sales_to_week(
                 sheet=MagicMock(),
