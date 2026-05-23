@@ -2511,7 +2511,16 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     existing_map_raw = read_item_row_map(sheet, spreadsheet_id, stand_name)
     existing_map = {}
     for row_name, row_num in existing_map_raw.items():
-        existing_map.setdefault(_canonical_item_name(row_name), row_num)
+        canonical_name = _canonical_item_name(row_name)
+        if canonical_name in existing_map:
+            logging.getLogger(__name__).warning(
+                "Duplicate item variant in Column A for stand %s: %r (and another variant); using earliest row number.",
+                stand_name,
+                canonical_name,
+            )
+            existing_map[canonical_name] = min(existing_map[canonical_name], row_num)
+        else:
+            existing_map[canonical_name] = row_num
 
     # -- Get integer sheet ID for batchUpdate calls --
     sheet_id = get_sheet_id(service, spreadsheet_id, stand_name)
