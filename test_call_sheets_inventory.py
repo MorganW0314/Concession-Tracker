@@ -368,6 +368,31 @@ class SyncStandItemListTests(unittest.TestCase):
         # No insertions should have been made.
         service.spreadsheets.return_value.batchUpdate.assert_not_called()
 
+    def test_idempotent_with_item_name_variants(self):
+        """Dash/space/case/hidden-char variants should still be treated as existing."""
+        category_order = [("SNACKS", ["Crunchy Ra-Ra - Mango", "Go-Go Squeez"])]
+        col_a = [
+            ["ITEM"], [""],
+            ["SNACKS"],
+            ["  crunchy ra-ra  –mango\u00A0"],
+            ["Go-Go\u200BSqueez"],
+        ]
+        sheet = self._make_sheet(col_a)
+        service = _make_service()
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand",
+                         return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(result["added"], [])
+        self.assertCountEqual(result["skipped"], ["Crunchy Ra-Ra - Mango", "Go-Go Squeez"])
+        service.spreadsheets.return_value.batchUpdate.assert_not_called()
+
     # ------------------------------------------------------------------ #
     # Test: new item inserted into an existing category                    #
     # ------------------------------------------------------------------ #

@@ -272,8 +272,8 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
         ])
         try:
             result = take_modifiers(path)
-            self.assertIn("Gatorade Blue", result)
-            self.assertEqual(result["Gatorade Blue"]["sales"], 4)
+            self.assertIn("Gatorade - Blue", result)
+            self.assertEqual(result["Gatorade - Blue"]["sales"], 4)
             self.assertNotIn("Blue", result)
         finally:
             os.unlink(path)
