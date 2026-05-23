@@ -32,10 +32,19 @@ if "googleapiclient.discovery" not in sys.modules:
     sys.modules["googleapiclient"] = googleapiclient_module
     sys.modules["googleapiclient.discovery"] = discovery_module
 
-from email_summary import generate_email_body, get_stands_with_discrepancies, _get_category_for_item
+from email_summary import generate_email_body, get_stands_with_discrepancies, _get_category_for_item, _negative_from_rows
 
 
 class EmailSummaryTests(unittest.TestCase):
+    def test_negative_from_rows_flags_negative_expected_without_actual(self):
+        rows = [
+            {"item": "Short Item", "expected": 10.0, "actual": 8.0, "variance": -2.0},
+            {"item": "Negative Expected", "expected": -5.0, "actual": None, "variance": None},
+            {"item": "Fine Item", "expected": 12.0, "actual": 12.0, "variance": 0.0},
+        ]
+        flagged = _negative_from_rows(rows)
+        self.assertEqual([row["item"] for row in flagged], ["Short Item", "Negative Expected"])
+
     def test_get_stands_with_discrepancies(self):
         stand_names = ["Stand A", "Stand B", "Stand C"]
         negative_items = {
@@ -81,6 +90,20 @@ class EmailSummaryTests(unittest.TestCase):
         self.assertIn("Hot Dog................. 24 expected  ⚠️  Variance: -3.00", body)
         self.assertIn("Stand B", body)
         self.assertIn("✅ All clear", body)
+
+    def test_generate_email_body_flags_negative_expected_without_actual(self):
+        stand_names = ["Stand A", "Stand B"]
+        stand_a_rows = [
+            {"item": "Hot Dog", "sales": 5.0, "expected": -5.0, "actual": None, "variance": None},
+        ]
+        negative_items = {"Stand A": _negative_from_rows(stand_a_rows)}
+        stand_rows = {"Stand A": stand_a_rows}
+
+        body = generate_email_body(stand_names, negative_items, stand_rows=stand_rows, week_label="Week of 05-20-2026")
+
+        self.assertIn("- Stands with Discrepancies: 1", body)
+        self.assertIn("- Items with Negative Variance: 1", body)
+        self.assertIn("Hot Dog................. -5 expected  ⚠️  Variance: -5.00", body)
 
     def test_get_category_for_item(self):
         self.assertEqual(_get_category_for_item("Vanilla"), "ICE_CREAM_TOFTS")
