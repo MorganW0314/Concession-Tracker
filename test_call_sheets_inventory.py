@@ -164,7 +164,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertIn("Mint Chip", treemont["ICE_CREAM_TOFTS"])
         self.assertIn("Coca Cola", treemont["FOUNTAIN_DRINKS"])
         self.assertTrue(
-            {"7up", "Big Red", "Diet RC", "Dr. Pepper", "Root Beer", "RC Cola", "Coca Cola"}.issubset(
+            {"7up", "Big Red", "Diet RC", "Dr. Pepper", "Lemonade", "Root Beer", "RC Cola", "Coca Cola"}.issubset(
                 set(treemont["FOUNTAIN_DRINKS"])
             )
         )
@@ -172,9 +172,15 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertNotIn("Pepsi", treemont["FOUNTAIN_DRINKS"])
         self.assertNotIn("Starry", treemont["FOUNTAIN_DRINKS"])
 
-    def test_fountain_drinks_list_excludes_mt_dew_and_lemonade(self):
+    def test_fountain_drinks_list_excludes_mt_dew_and_includes_lemonade(self):
         self.assertNotIn("Mt. Dew", Call_sheets.FOUNTAIN_DRINKS)
-        self.assertNotIn("Lemonade", Call_sheets.FOUNTAIN_DRINKS)
+        self.assertIn("Lemonade", Call_sheets.FOUNTAIN_DRINKS)
+
+    def test_lemonade_restricted_to_non_ptac_stands(self):
+        self.assertIn("Lemonade", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
+        self.assertNotIn("PTAC", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Lemonade"])
+        self.assertIn("TREMONT", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Lemonade"])
+        self.assertIn("Bevelhymer Green", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Lemonade"])
 
     def test_read_deliveries_converts_fountain_packages_to_stand_oz(self):
         header = [["Date", "Item Name", "Packages", "Units per package"]]
@@ -182,6 +188,7 @@ class InventoryRefactorTests(unittest.TestCase):
         root_beer_rows = [["05-10-2026", "Root Beer", "1", "1"]]
         ignored_units_per_package = "999"
         popcorn_rows = [["05-10-2026", "Popcorn", "2", ignored_units_per_package]]
+        granola_rows = [["05-10-2026", "Granola Bar", "2", ignored_units_per_package]]
         hot_dog_rows = [["05-10-2026", "Hot Dogs", "2", ignored_units_per_package]]
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
@@ -204,9 +211,59 @@ class InventoryRefactorTests(unittest.TestCase):
             reed_popcorn = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_popcorn["Popcorn"], 72)
 
+        with patch.object(Call_sheets, "get_values", side_effect=[header, granola_rows]):
+            reed_granola = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
+        self.assertEqual(reed_granola["Granola Bar"], 72)
+
         with patch.object(Call_sheets, "get_values", side_effect=[header, hot_dog_rows]):
             reed_hot_dogs = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_hot_dogs["Hot Dogs"], 1998)
+
+    def test_snacks_include_granola_and_split_crunchy_rara_flavors(self):
+        self.assertIn("Granola Bar", Call_sheets.SNACKS)
+        self.assertIn("Crunchy Ra-Ra - Mango", Call_sheets.SNACKS)
+        self.assertIn("Crunchy Ra-Ra - Sprinkles", Call_sheets.SNACKS)
+        self.assertIn("Crunchy Ra-Ra - Strawberry", Call_sheets.SNACKS)
+        self.assertNotIn("Crunchy Ra-Ra Yogurt", Call_sheets.SNACKS)
+
+    def test_slushie_constants_and_flavor_rows(self):
+        self.assertEqual(Call_sheets.SLUSHIE_SERVINGS_PER_BAG, 10)
+        self.assertEqual(Call_sheets.SLUSHIE_BAGS_PER_CONTAINER, 3)
+        self.assertEqual(Call_sheets.SLUSHIE_OZ_PER_SERVING, 16)
+        self.assertEqual(Call_sheets.SLUSHIE_OZ_PER_BAG, 160)
+        self.assertEqual(Call_sheets.SLUSHIE_SERVINGS_PER_CONTAINER, 30)
+        self.assertEqual(Call_sheets.SLUSHIE_OZ_PER_CONTAINER, 480)
+        self.assertEqual(
+            Call_sheets.SLUSHIE_FLAVORS,
+            [
+                "Slushie - Mango",
+                "Slushie - Blue Raz",
+                "Slushie - Tigers Blood",
+                "Slushie - Green Apple",
+                "Slushie - Peach",
+            ],
+        )
+        category_names = [name for name, _ in Call_sheets.DEFAULT_CATEGORY_ORDER]
+        self.assertIn("SLUSHIE_MIX", category_names)
+        self.assertIn("SLUSHIE_FLAVORS", category_names)
+
+    def test_write_modifier_sales_converts_slushie_servings_to_bags(self):
+        service = MagicMock()
+        with (
+            patch.object(Call_sheets, "find_last_week_start_col", return_value=1),
+            patch.object(Call_sheets, "read_item_row_map", return_value={"Slushie - Mango": 5}),
+        ):
+            Call_sheets.write_modifier_sales_to_week(
+                sheet=MagicMock(),
+                service=service,
+                spreadsheet_id="sid",
+                stand_name="TREMONT",
+                modifier_rows={"Slushie - Mango": {"sales": 3}},
+            )
+
+        body = service.spreadsheets.return_value.values.return_value.batchUpdate.call_args.kwargs["body"]
+        self.assertEqual(body["data"][0]["range"], "'TREMONT'!D5")
+        self.assertEqual(body["data"][0]["values"], [[0.3]])
 
 
 # ---------------------------------------------------------------------------

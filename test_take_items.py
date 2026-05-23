@@ -4,8 +4,10 @@ import tempfile
 import unittest
 
 from Take_items import (
+    CRUNCHY_RARA_MODIFIER_PREFIX,
     ICE_CREAM_FLAVOR_SET_PREFIX,
     MODIFIER_ITEMS,
+    SLUSHIE_FLAVOR_SET_PREFIX,
     _TOFTS_ICE_CREAM_SKIP_ITEMS,
     take_items,
     take_modifiers,
@@ -45,8 +47,18 @@ class ModifierItemsConstantTests(unittest.TestCase):
             ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow", "Gatorade - Orange"],
         )
 
+    def test_slushie_and_crunchy_items_in_modifier_items(self):
+        self.assertIn("Slushie", MODIFIER_ITEMS)
+        self.assertIn("Crunchy Ra-Ra", MODIFIER_ITEMS)
+        self.assertIn("Crunchy Rara", MODIFIER_ITEMS)
+        self.assertIn("Crunchy Ra-Ra Yogurt", MODIFIER_ITEMS)
+
     def test_ice_cream_flavor_prefix_constant(self):
         self.assertEqual(ICE_CREAM_FLAVOR_SET_PREFIX, "Ice Cream Flavor")
+
+    def test_new_modifier_prefix_constants(self):
+        self.assertEqual(SLUSHIE_FLAVOR_SET_PREFIX, "Slushie Flavor")
+        self.assertEqual(CRUNCHY_RARA_MODIFIER_PREFIX, "Crunchy")
 
     def test_tofts_skip_items_includes_base_flavors(self):
         for flavor in ("Cookie Monster", "Blueberry Waffle Cone", "Vanilla", "Chocolate",
@@ -154,6 +166,22 @@ class TakeItemsSkipTests(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_slushie_and_crunchy_base_items_are_skipped(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Slushie", "Item Variation": "Regular", "Units Sold": "4", "Units Refunded": "0"},
+            {"Item Name": "Crunchy Ra-Ra", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
+            {"Item Name": "Crunchy Ra-Ra Yogurt", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "0"},
+            {"Item Name": "Hot Dog", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertNotIn("Slushie", result)
+            self.assertNotIn("Crunchy Ra-Ra", result)
+            self.assertNotIn("Crunchy Ra-Ra Yogurt", result)
+            self.assertEqual(result["Hot Dog"]["sales"], 1)
+        finally:
+            os.unlink(path)
+
 
 class TakeModifiersIceCreamTests(unittest.TestCase):
     """Verify take_modifiers() correctly parses ice cream flavor modifier CSVs."""
@@ -247,6 +275,28 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
             self.assertIn("Gatorade Blue", result)
             self.assertEqual(result["Gatorade Blue"]["sales"], 4)
             self.assertNotIn("Blue", result)
+        finally:
+            os.unlink(path)
+
+    def test_slushie_flavor_modifier_uses_slushie_dash_name(self):
+        path = _write_tmp_csv([
+            {"Modifier Set": "Slushie Flavor", "Modifier": "Mango", "Qty Sold": "3", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Slushie Flavor", "Modifier": "Mango", "Qty Sold": "2", "Gross Sales": "$0.00"},
+        ])
+        try:
+            result = take_modifiers(path)
+            self.assertEqual(result["Slushie - Mango"]["sales"], 5)
+        finally:
+            os.unlink(path)
+
+    def test_crunchy_rara_modifier_uses_crunchy_dash_name(self):
+        path = _write_tmp_csv([
+            {"Modifier Set": "Crunchy Ra-Ra Flavor", "Modifier": "Strawberry", "Qty Sold": "1", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Crunchy Rara Flavor", "Modifier": "Strawberry", "Qty Sold": "2", "Gross Sales": "$0.00"},
+        ])
+        try:
+            result = take_modifiers(path)
+            self.assertEqual(result["Crunchy Ra-Ra - Strawberry"]["sales"], 3)
         finally:
             os.unlink(path)
 
