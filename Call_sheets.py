@@ -1522,7 +1522,9 @@ SNACKS = [
     "Pita Chips",
     "Assorted Chips",
     "Goldfish",
-    # Backward-compatible legacy item name: "Crunchy Ra-Ra Yogurt"
+    # Legacy "Crunchy Ra-Ra Yogurt" standalone row was replaced by flavor rows;
+    # backward compatibility is maintained by keeping "Crunchy Ra-Ra Yogurt" in
+    # Take_items.MODIFIER_ITEMS so take_items() skips that legacy base item.
     "Crunchy Ra-Ra - Mango",
     "Crunchy Ra-Ra - Sprinkles",
     "Crunchy Ra-Ra - Strawberry",
@@ -1636,7 +1638,17 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "7up": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
     "Big Red": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
     "Diet RC": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
-    "Lemonade": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY", "Bevelhymer Green", "Bevelhymer Yellow"},
+    "Lemonade": {
+        "REED ROAD",
+        "TREMONT",
+        "DEVON",
+        "NWSC",
+        "HILLIARD2 (EAST)",
+        "HILLIARD1 (WEST)",
+        "BEXLEY",
+        "Bevelhymer Green",
+        "Bevelhymer Yellow",
+    },
     "RC Cola": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
     "Coca Cola": {"REED ROAD", "TREMONT", "DEVON"},
     "Diet Coke": {"REED ROAD", "TREMONT", "DEVON"},

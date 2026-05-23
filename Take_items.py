@@ -19,6 +19,7 @@ MODIFIER_ITEMS = {
     "Slushie": [],      # slushie flavors come from modifier CSV
     "Crunchy Ra-Ra": [],  # crunchy flavors come from modifier CSV
     "Crunchy Rara": [],   # backward-compatible naming variant
+    "Crunchy Ra-Ra Yogurt": [],  # legacy base name kept for backward compatibility
     "Single Dip": [],   # ice cream — flavors come from modifier CSV
     "Double Dip": [],   # ice cream — flavors come from modifier CSV
     "Triple Dip": [],   # ice cream — flavors come from modifier CSV
@@ -33,6 +34,9 @@ MODIFIER_ITEMS = {
 ICE_CREAM_FLAVOR_SET_PREFIX = "Ice Cream Flavor"
 SLUSHIE_FLAVOR_SET_PREFIX = "Slushie Flavor"
 CRUNCHY_RARA_MODIFIER_PREFIX = "Crunchy"
+CRUNCHY_RARA_MODIFIER_KEYS = {"Crunchy Ra-Ra", "Crunchy Rara", "Crunchy Ra-Ra Yogurt"}
+SLUSHIE_FLAVOR_SET_PREFIX_LOWER = SLUSHIE_FLAVOR_SET_PREFIX.lower()
+CRUNCHY_RARA_MODIFIER_PREFIX_LOWER = CRUNCHY_RARA_MODIFIER_PREFIX.lower()
 
 # All Toft's ice cream item names that may appear in the item-sales CSV.
 # These are skipped in take_items() because ice cream is now tracked entirely
@@ -238,9 +242,11 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
         "{modifier}"  →  "Cookie Monster"
     - For slushie flavor sets (modifier set contains SLUSHIE_FLAVOR_SET_PREFIX):
         "Slushie - {modifier}"  →  "Slushie - Mango"
-    - For crunchy ra-ra modifier sets (contains "Crunchy" / "Ra-Ra" / "Rara"):
+      Quantities are accumulated across matching slushie flavor rows.
+    - For crunchy ra-ra modifier sets (matched by CRUNCHY_RARA_MODIFIER_KEYS):
         "Crunchy Ra-Ra - {modifier}"  →  "Crunchy Ra-Ra - Strawberry"
-      Quantities are accumulated across all Ice Cream Flavor N sets so that
+      Quantities are accumulated across matching crunchy flavor rows.
+    - Ice cream quantities are accumulated across all Ice Cream Flavor N sets so
       the same flavor appearing in Flavor 1, Flavor 2, and Flavor 3 is summed.
 
     Args:
@@ -323,12 +329,11 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                 modifier_set_lower = modifier_set.lower()
                 if ICE_CREAM_FLAVOR_SET_PREFIX in modifier_set:
                     item_name = modifier
-                elif SLUSHIE_FLAVOR_SET_PREFIX.lower() in modifier_set_lower:
+                elif SLUSHIE_FLAVOR_SET_PREFIX_LOWER in modifier_set_lower:
                     item_name = f"Slushie - {modifier}"
                 elif (
-                    CRUNCHY_RARA_MODIFIER_PREFIX.lower() in modifier_set_lower
-                    or "ra-ra" in modifier_set_lower
-                    or "rara" in modifier_set_lower
+                    base_name in CRUNCHY_RARA_MODIFIER_KEYS
+                    and CRUNCHY_RARA_MODIFIER_PREFIX_LOWER in modifier_set_lower
                 ):
                     item_name = f"Crunchy Ra-Ra - {modifier}"
                 else:

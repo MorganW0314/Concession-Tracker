@@ -51,6 +51,7 @@ class ModifierItemsConstantTests(unittest.TestCase):
         self.assertIn("Slushie", MODIFIER_ITEMS)
         self.assertIn("Crunchy Ra-Ra", MODIFIER_ITEMS)
         self.assertIn("Crunchy Rara", MODIFIER_ITEMS)
+        self.assertIn("Crunchy Ra-Ra Yogurt", MODIFIER_ITEMS)
 
     def test_ice_cream_flavor_prefix_constant(self):
         self.assertEqual(ICE_CREAM_FLAVOR_SET_PREFIX, "Ice Cream Flavor")
@@ -169,12 +170,14 @@ class TakeItemsSkipTests(unittest.TestCase):
         path = _write_tmp_csv([
             {"Item Name": "Slushie", "Item Variation": "Regular", "Units Sold": "4", "Units Refunded": "0"},
             {"Item Name": "Crunchy Ra-Ra", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
+            {"Item Name": "Crunchy Ra-Ra Yogurt", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "0"},
             {"Item Name": "Hot Dog", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
         ])
         try:
             result = take_items(path)
             self.assertNotIn("Slushie", result)
             self.assertNotIn("Crunchy Ra-Ra", result)
+            self.assertNotIn("Crunchy Ra-Ra Yogurt", result)
             self.assertEqual(result["Hot Dog"]["sales"], 1)
         finally:
             os.unlink(path)
