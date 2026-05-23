@@ -756,6 +756,44 @@ def read_master_items(sheet, spreadsheet_id, stand_name):
     return items if items else None
 
 
+def _canonical_item_name(item_name):
+    """Normalize item names for matching/filtering across spacing variants."""
+    if not item_name:
+        return ""
+    normalized = " ".join(item_name.strip().split())
+    return re.sub(r"\s*-\s*", " - ", normalized)
+
+
+def _build_category_order_for_stand(sheet, spreadsheet_id, stand_name):
+    """Build stand-aware category order from master tab with safe fallbacks."""
+    master_items = read_master_items(sheet, spreadsheet_id, stand_name)
+    if not master_items:
+        return get_default_category_order_for_stand(stand_name)
+
+    category_map = {}
+    for category, item in master_items:
+        canonical_item = _canonical_item_name(item)
+        if not canonical_item:
+            continue
+        if not _is_item_available_at_stand(canonical_item, stand_name):
+            continue
+        category_map.setdefault(category, [])
+        if canonical_item not in category_map[category]:
+            category_map[category].append(canonical_item)
+
+    default_order = get_default_category_order_for_stand(stand_name)
+    for category, default_items in default_order:
+        category_map.setdefault(category, [])
+        existing_items = {_canonical_item_name(x) for x in category_map[category]}
+        for item in default_items:
+            canonical_item = _canonical_item_name(item)
+            if canonical_item not in existing_items:
+                category_map[category].append(canonical_item)
+                existing_items.add(canonical_item)
+
+    return [(category, items) for category, items in category_map.items() if items]
+
+
 # ---------------------------------------------------------------------------
 # Master Items lookup (global "Master Items" tab, not per-stand)
 # ---------------------------------------------------------------------------
@@ -1481,7 +1519,7 @@ BOTTLED_DRINKS = [
     "Bloom Pop - Watermelon Lime",
     "Poppi - Watermelon",
     "Poppi - Wild Berry",
-    "Poppi -Raspberry Rose ",
+    "Poppi - Raspberry Rose",
     "Fairlife Protein",
     "La Colombe - Vanilla",
     "La Colombe - Mocha",
@@ -1656,7 +1694,7 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Starry": {"PTAC"},
     "Poppi - Watermelon": {"PTAC"},
     "Poppi - Wild Berry": {"PTAC"},
-    "Poppi - Raspberry Rose ": {"PTAC"},
+    "Poppi - Raspberry Rose": {"PTAC"},
     "Popcorn": {"TREMONT", "REED ROAD", "NWSC"},
     "Bloom Pop - Strawberry Cream":    {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
     "Bloom Pop - Raspberry Lemonade":  {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
@@ -1671,7 +1709,8 @@ def _is_item_available_at_stand(item_name, stand_name):
     if item_name in PREMIUM_ICE_CREAM_ITEMS:
         return stand_name in PREMIUM_ICE_CREAM_STANDS
 
-    allowed_stands = LOCATION_SPECIFIC_ITEM_STANDS.get(item_name)
+    canonical_item = _canonical_item_name(item_name)
+    allowed_stands = LOCATION_SPECIFIC_ITEM_STANDS.get(canonical_item)
     if allowed_stands is not None:
         return stand_name in allowed_stands
 
@@ -1828,18 +1867,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     # Try to read from "Master Items-{stand}" tab first; fall back to
     # DEFAULT_CATEGORY_ORDER (which includes INGREDIENTS / COMPONENTS).
     # ============================
-    master_items = read_master_items(sheet, spreadsheet_id, stand_name)
-
-    if master_items:
-        from collections import OrderedDict
-        category_map = OrderedDict()
-        for category, item in master_items:
-            if category not in category_map:
-                category_map[category] = []
-            category_map[category].append(item)
-        CATEGORY_ORDER = list(category_map.items())
-    else:
-        CATEGORY_ORDER = get_default_category_order_for_stand(stand_name)
+    CATEGORY_ORDER = _build_category_order_for_stand(sheet, spreadsheet_id, stand_name)
 
     # ============================
     # ICE CREAM SCOOP TOTALS — compute BEFORE consolidation
@@ -2473,18 +2501,22 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
         "skipped" – list of item names that already existed in Column A
     """
     # -- Build expected category order (same logic as write_full_week) --
-    master_items = read_master_items(sheet, spreadsheet_id, stand_name)
-    if master_items:
-        from collections import OrderedDict as _OD
-        _category_map = _OD()
-        for _cat, _itm in master_items:
-            _category_map.setdefault(_cat, []).append(_itm)
-        category_order = list(_category_map.items())
-    else:
-        category_order = get_default_category_order_for_stand(stand_name)
+    category_order = _build_category_order_for_stand(sheet, spreadsheet_id, stand_name)
 
     # -- Read current Column A --
-    existing_map = read_item_row_map(sheet, spreadsheet_id, stand_name)
+    existing_map_raw = read_item_row_map(sheet, spreadsheet_id, stand_name)
+    existing_map = {}
+    for row_name, row_num in existing_map_raw.items():
+        canonical_name = _canonical_item_name(row_name)
+        if canonical_name in existing_map:
+            logging.getLogger(__name__).warning(
+                "Duplicate item variant in Column A for stand %s: %r (and another variant); using earliest row number.",
+                stand_name,
+                canonical_name,
+            )
+            existing_map[canonical_name] = min(existing_map[canonical_name], row_num)
+        else:
+            existing_map[canonical_name] = row_num
 
     # -- Get integer sheet ID for batchUpdate calls --
     sheet_id = get_sheet_id(service, spreadsheet_id, stand_name)
@@ -2579,6 +2611,9 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
         else:
             cell_format = {
                 "backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0},
+                "backgroundColorStyle": {
+                    "rgbColor": {"red": 1.0, "green": 1.0, "blue": 1.0}
+                },
                 "textFormat": {"bold": False},
             }
 
@@ -2594,7 +2629,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
                         "endColumnIndex": 1,
                     },
                     "cell": {"userEnteredFormat": cell_format},
-                    "fields": "userEnteredFormat(backgroundColor,textFormat)",
+                    "fields": "userEnteredFormat(backgroundColor,backgroundColorStyle,textFormat)",
                 }
             }]},
         ).execute()

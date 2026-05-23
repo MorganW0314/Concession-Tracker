@@ -116,6 +116,17 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertIn("Bevelhymer Yellow", stands)
         self.assertNotIn("Bevelhymer", stands)
 
+    def test_poppi_raspberry_rose_name_and_restriction_are_canonical(self):
+        self.assertIn("Poppi - Raspberry Rose", Call_sheets.BOTTLED_DRINKS)
+        self.assertEqual(
+            Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Poppi - Raspberry Rose"],
+            {"PTAC"},
+        )
+        nwsc = dict(Call_sheets.get_default_category_order_for_stand("NWSC"))
+        ptac = dict(Call_sheets.get_default_category_order_for_stand("PTAC"))
+        self.assertNotIn("Poppi - Raspberry Rose", nwsc["BOTTLED_DRINKS"])
+        self.assertIn("Poppi - Raspberry Rose", ptac["BOTTLED_DRINKS"])
+
     def test_consolidate_variants_initializes_full_base_row_shape(self):
         rows = {"Vanilla Double Scoop": {"sales": 2, "deliveries": 3, "spoilage": 1}}
         Call_sheets.consolidate_variants_to_base(rows, {"Vanilla Double Scoop": "Vanilla"})
@@ -264,6 +275,18 @@ class InventoryRefactorTests(unittest.TestCase):
         body = service.spreadsheets.return_value.values.return_value.batchUpdate.call_args.kwargs["body"]
         self.assertEqual(body["data"][0]["range"], "'TREMONT'!D5")
         self.assertEqual(body["data"][0]["values"], [[0.3]])
+
+    def test_master_category_order_adds_default_slushie_flavors(self):
+        master_items = [("BOTTLED_DRINKS", "Bottled Water")]
+        with patch.object(Call_sheets, "read_master_items", return_value=master_items):
+            category_order = dict(
+                Call_sheets._build_category_order_for_stand(MagicMock(), "sid", "PTAC")
+            )
+        self.assertIn("SLUSHIE_FLAVORS", category_order)
+        self.assertEqual(
+            set(category_order["SLUSHIE_FLAVORS"]),
+            set(Call_sheets.SLUSHIE_FLAVORS),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -486,6 +509,42 @@ class SyncStandItemListTests(unittest.TestCase):
         self.assertIn("skipped", result)
         self.assertIsInstance(result["added"], list)
         self.assertIsInstance(result["skipped"], list)
+
+    def test_new_item_format_explicitly_sets_white_background_style(self):
+        category_order = [("CAT_A", ["Apple", "Banana"])]
+        col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"]]
+        sheet = self._make_sheet(col_a)
+        service = _make_service()
+
+        repeat_requests = []
+
+        def capture_batch(spreadsheetId, body):
+            req = body["requests"][0]
+            if "repeatCell" in req:
+                repeat_requests.append(req["repeatCell"])
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand",
+                         return_value=category_order),
+        ):
+            Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(len(repeat_requests), 1)
+        repeat_cell = repeat_requests[0]
+        fmt = repeat_cell["cell"]["userEnteredFormat"]
+        self.assertEqual(
+            fmt["backgroundColorStyle"]["rgbColor"],
+            {"red": 1.0, "green": 1.0, "blue": 1.0},
+        )
+        self.assertIn("backgroundColorStyle", repeat_cell["fields"])
 
 
 if __name__ == "__main__":
