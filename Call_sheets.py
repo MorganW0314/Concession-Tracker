@@ -167,6 +167,13 @@ def read_item_row_map(sheet, spreadsheet_id, sheet_name):
         if not normalized_name:
             continue
         if normalized_name in item_row_map:
+            logging.getLogger(__name__).warning(
+                "Duplicate item variant in Column A for sheet %s: %r (row %d conflicts with row %d); using earliest row number.",
+                sheet_name,
+                normalized_name,
+                row_num,
+                item_row_map[normalized_name],
+            )
             item_row_map[normalized_name] = min(item_row_map[normalized_name], row_num)
         else:
             item_row_map[normalized_name] = row_num
@@ -1973,14 +1980,15 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
             rows[item]["starting"] = last_week_actuals[normalized_item]
         else:
             matched = item_matcher.find_match(item)
-            normalized_match = normalize_item_name(matched) if matched else ""
-            if normalized_match and normalized_match in last_week_actuals:
-                rows[item]["starting"] = last_week_actuals[normalized_match]
-            else:
-                rows[item]["starting"] = 0
-                # Only report as unmatched when a previous week exists
-                if last_week_actuals:
-                    unmatched_starting.append(item)
+            if matched:
+                normalized_match = normalize_item_name(matched)
+                if normalized_match in last_week_actuals:
+                    rows[item]["starting"] = last_week_actuals[normalized_match]
+                    continue
+            rows[item]["starting"] = 0
+            # Only report as unmatched when a previous week exists
+            if last_week_actuals:
+                unmatched_starting.append(item)
     audit_logger.log_starting_inventory(last_week_actuals, unmatched_starting)
 
     # ============================

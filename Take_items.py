@@ -148,7 +148,8 @@ def take_items(csv_file_path, stand_name=None):
                 skipped_rows += 1
                 continue
 
-            if normalize_item_name(item) in _NORMALIZED_MODIFIER_ITEMS:
+            normalized_item = normalize_item_name(item)
+            if normalized_item in _NORMALIZED_MODIFIER_ITEMS:
                 qty = net_sales
                 _logger.info(
                     "⏭️  SKIPPING MODIFIER ITEM: %r (qty=%d) — will be populated by modifier-sales CSV",
