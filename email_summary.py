@@ -86,10 +86,15 @@ def _read_latest_week_rows(sheet, spreadsheet_id: str, stand_name: str) -> List[
 
 
 def _negative_from_rows(rows: List[dict]) -> List[dict]:
-    return sorted(
-        [r for r in rows if r["actual"] is not None and r["actual"] < r["expected"]],
-        key=lambda r: r["variance"],
-    )
+    flagged = []
+    for r in rows:
+        expected = r.get("expected")
+        actual = r.get("actual")
+        if expected is not None and expected < 0:
+            flagged.append(r)
+        elif actual is not None and expected is not None and actual < expected:
+            flagged.append(r)
+    return sorted(flagged, key=lambda r: (r.get("variance") or 0))
 
 
 def get_negative_variance_items(sheet, spreadsheet_id: str, stand_names: Iterable[str]) -> Dict[str, List[dict]]:
@@ -227,13 +232,20 @@ def generate_email_body(
             lines.extend(["", EMAIL_CATEGORY_DISPLAY_NAMES.get(category, category)])
             for row in items:
                 expected_line = _format_expected_line(row["item"], row["expected"], category)
+                expected = row.get("expected")
                 actual = row.get("actual")
-                if actual is not None and actual < row["expected"]:
+                if expected is not None and expected < 0:
                     if category == "ICE_CREAM_TOFTS":
-                        variance_tubs = (actual - row["expected"]) / SCOOPS_PER_TUB
+                        expected_tubs = expected / SCOOPS_PER_TUB
+                        expected_line += f"  ⚠️  Variance: {expected_tubs:.2f} tubs"
+                    else:
+                        expected_line += f"  ⚠️  Variance: {expected:.2f}"
+                elif actual is not None and expected is not None and actual < expected:
+                    if category == "ICE_CREAM_TOFTS":
+                        variance_tubs = (actual - expected) / SCOOPS_PER_TUB
                         expected_line += f"  ⚠️  Variance: {variance_tubs:.2f} tubs"
                     else:
-                        variance = actual - row["expected"]
+                        variance = actual - expected
                         expected_line += f"  ⚠️  Variance: {variance:.2f}"
                 lines.append(expected_line)
 
