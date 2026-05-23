@@ -9,6 +9,7 @@ import re
 import unicodedata
 import requests
 from data_validation import AuditLogger, DataValidator, ItemMatcher, CategoryAwareItemMatcher
+from item_name_utils import normalize_item_name
 
 
 def get_sheet_id(service, spreadsheet_id, sheet_name):
@@ -144,7 +145,7 @@ def find_last_week_start_col(sheet, spreadsheet_id, sheet_name):
 
 
 def read_item_row_map(sheet, spreadsheet_id, sheet_name):
-    """Read column A of a stand sheet and return {item_name: row_number}.
+    """Read column A of a stand sheet and return {normalized_item_name: row_number}.
 
     Rows 1 and 2 are header rows and are always skipped.
     Row numbers are 1-indexed (matching Google Sheets notation).
@@ -160,8 +161,22 @@ def read_item_row_map(sheet, spreadsheet_id, sheet_name):
         row_num = i + 1
         if row_num < DATA_START_ROW:
             continue
-        if cell and cell[0].strip():
-            item_row_map[cell[0].strip()] = row_num
+        if not cell:
+            continue
+        normalized_name = normalize_item_name(cell[0])
+        if not normalized_name:
+            continue
+        if normalized_name in item_row_map:
+            logging.getLogger(__name__).warning(
+                "Duplicate item variant in Column A for sheet %s: %r (row %d conflicts with row %d); using earliest row number.",
+                sheet_name,
+                normalized_name,
+                row_num,
+                item_row_map[normalized_name],
+            )
+            item_row_map[normalized_name] = min(item_row_map[normalized_name], row_num)
+        else:
+            item_row_map[normalized_name] = row_num
     return item_row_map
 
 
@@ -762,6 +777,10 @@ def _canonical_item_name(item_name):
         return ""
     normalized = " ".join(item_name.strip().split())
     return re.sub(r"\s*-\s*", " - ", normalized)
+
+
+def _row_for_item_name(item_row_map, item_name):
+    return item_row_map.get(normalize_item_name(item_name))
 
 
 def _build_category_order_for_stand(sheet, spreadsheet_id, stand_name):
@@ -1956,17 +1975,20 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     )
     unmatched_starting = []
     for item in rows:
-        if item in last_week_actuals:
-            rows[item]["starting"] = last_week_actuals[item]
+        normalized_item = normalize_item_name(item)
+        if normalized_item in last_week_actuals:
+            rows[item]["starting"] = last_week_actuals[normalized_item]
         else:
             matched = item_matcher.find_match(item)
-            if matched and matched in last_week_actuals:
-                rows[item]["starting"] = last_week_actuals[matched]
-            else:
-                rows[item]["starting"] = 0
-                # Only report as unmatched when a previous week exists
-                if last_week_actuals:
-                    unmatched_starting.append(item)
+            if matched:
+                normalized_match = normalize_item_name(matched)
+                if normalized_match in last_week_actuals:
+                    rows[item]["starting"] = last_week_actuals[normalized_match]
+                    continue
+            rows[item]["starting"] = 0
+            # Only report as unmatched when a previous week exists
+            if last_week_actuals:
+                unmatched_starting.append(item)
     audit_logger.log_starting_inventory(last_week_actuals, unmatched_starting)
 
     # ============================
@@ -2090,7 +2112,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
 
     for category_name, item_list in CATEGORY_ORDER:
         for item in sorted(item_list):
-            row_num = item_row_map.get(item)
+            row_num = _row_for_item_name(item_row_map, item)
             if not row_num:
                 continue
 
@@ -2320,7 +2342,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
 
     # Category rows: light-blue background for this week's new columns.
     for category_name, item_list in CATEGORY_ORDER:
-        cat_row = item_row_map.get(category_name)
+        cat_row = _row_for_item_name(item_row_map, category_name)
         if cat_row:
             fmt_requests.append({
                 "repeatCell": {
@@ -2443,7 +2465,7 @@ def write_modifier_sales_to_week(sheet, service, spreadsheet_id, stand_name, mod
 
     batch_data = []
     for item_name, mod_data in modifier_rows.items():
-        row_num = item_row_map.get(item_name)
+        row_num = _row_for_item_name(item_row_map, item_name)
         if row_num is None:
             _modifier_logger.warning(
                 "Modifier item %r not found in sheet '%s' — skipping.",
@@ -2504,19 +2526,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     category_order = _build_category_order_for_stand(sheet, spreadsheet_id, stand_name)
 
     # -- Read current Column A --
-    existing_map_raw = read_item_row_map(sheet, spreadsheet_id, stand_name)
-    existing_map = {}
-    for row_name, row_num in existing_map_raw.items():
-        canonical_name = _canonical_item_name(row_name)
-        if canonical_name in existing_map:
-            logging.getLogger(__name__).warning(
-                "Duplicate item variant in Column A for stand %s: %r (and another variant); using earliest row number.",
-                stand_name,
-                canonical_name,
-            )
-            existing_map[canonical_name] = min(existing_map[canonical_name], row_num)
-        else:
-            existing_map[canonical_name] = row_num
+    existing_map = read_item_row_map(sheet, spreadsheet_id, stand_name)
 
     # -- Get integer sheet ID for batchUpdate calls --
     sheet_id = get_sheet_id(service, spreadsheet_id, stand_name)
@@ -2535,9 +2545,10 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     for cat_idx, (category_name, item_list) in enumerate(category_order):
         sorted_items = sorted(item_list)
 
-        if category_name in existing_map:
-            last_known_row = existing_map[category_name]
-            item_anchor = existing_map[category_name]
+        normalized_category_name = normalize_item_name(category_name)
+        if normalized_category_name in existing_map:
+            last_known_row = existing_map[normalized_category_name]
+            item_anchor = existing_map[normalized_category_name]
         else:
             # Category header is missing.  Anchor it (and its items) after the
             # last row we've seen so far.  When processed bottom-to-top the
@@ -2549,10 +2560,11 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
             item_anchor = last_known_row
 
         for item_idx, item in enumerate(sorted_items):
-            if item in existing_map:
+            normalized_item = normalize_item_name(item)
+            if normalized_item in existing_map:
                 skipped.append(item)
-                last_known_row = existing_map[item]
-                item_anchor = existing_map[item]
+                last_known_row = existing_map[normalized_item]
+                item_anchor = existing_map[normalized_item]
             else:
                 # Insert this item after the nearest predecessor that exists.
                 insertions.append((item_anchor, (cat_idx, item_idx), item, False))

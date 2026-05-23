@@ -3,6 +3,7 @@ import logging
 import os
 
 from data_validation import AuditLogger, _make_logger
+from item_name_utils import normalize_item_name
 
 COMBO_BREAKDOWN = {
     "Chili Cheese Dog Combo Meal": ["Chili Cheese Dog", "Assorted Chips"],
@@ -67,6 +68,8 @@ _TOFTS_ICE_CREAM_SKIP_ITEMS: frozenset = frozenset({
     "Blueberry Waffle Cone Single Scoop", "Blueberry Waffle Cone Double Scoop", "Blueberry Waffle Cone Triple Scoop",
     "Vanilla Single Scoop", "Vanilla Double Scoop", "Vanilla Triple Scoop",
 })
+
+_NORMALIZED_MODIFIER_ITEMS = {normalize_item_name(name) for name in MODIFIER_ITEMS}
 
 _logger = _make_logger("concession.Take_items")
 
@@ -145,7 +148,8 @@ def take_items(csv_file_path, stand_name=None):
                 skipped_rows += 1
                 continue
 
-            if item in MODIFIER_ITEMS:
+            normalized_item = normalize_item_name(item)
+            if normalized_item in _NORMALIZED_MODIFIER_ITEMS:
                 qty = net_sales
                 _logger.info(
                     "⏭️  SKIPPING MODIFIER ITEM: %r (qty=%d) — will be populated by modifier-sales CSV",
@@ -236,8 +240,11 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
     "Gross Sales" column in the ice cream CSV is safely ignored.
 
     Item-name construction:
-    - For regular modifier sets (e.g. "Gatorade Flavor"):
-        "{base_name} {modifier}"  →  "Gatorade Blue"
+    - For regular modifier sets:
+        "{base_name} {modifier}"  (example: "Crunchy Ra-Ra Yogurt Strawberry")
+      Special case:
+        Gatorade modifiers use a canonical dashed name
+        "Gatorade - {modifier}"  →  "Gatorade - Blue"
     - For ice cream flavor sets (modifier set contains ICE_CREAM_FLAVOR_SET_PREFIX):
         "{modifier}"  →  "Cookie Monster"
     - For slushie flavor sets (modifier set contains SLUSHIE_FLAVOR_SET_PREFIX):
@@ -336,6 +343,8 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                     and CRUNCHY_RARA_MODIFIER_PREFIX_LOWER in modifier_set_lower
                 ):
                     item_name = f"Crunchy Ra-Ra - {modifier}"
+                elif base_name == "Gatorade":
+                    item_name = f"Gatorade - {modifier}"
                 else:
                     item_name = f"{base_name} {modifier}"
 

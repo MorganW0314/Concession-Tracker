@@ -262,7 +262,7 @@ class InventoryRefactorTests(unittest.TestCase):
         service = MagicMock()
         with (
             patch.object(Call_sheets, "find_last_week_start_col", return_value=1),
-            patch.object(Call_sheets, "read_item_row_map", return_value={"Slushie - Mango": 5}),
+            patch.object(Call_sheets, "read_item_row_map", return_value={"slushie - mango": 5}),
         ):
             Call_sheets.write_modifier_sales_to_week(
                 sheet=MagicMock(),
@@ -366,6 +366,31 @@ class SyncStandItemListTests(unittest.TestCase):
             result["skipped"], ["Apple", "Banana", "Cherry", "Date"]
         )
         # No insertions should have been made.
+        service.spreadsheets.return_value.batchUpdate.assert_not_called()
+
+    def test_idempotent_with_item_name_variants(self):
+        """Dash/space/case/hidden-char variants should still be treated as existing."""
+        category_order = [("SNACKS", ["Crunchy Ra-Ra - Mango", "Go-Go Squeez"])]
+        col_a = [
+            ["ITEM"], [""],
+            ["SNACKS"],
+            ["  crunchy ra-ra  –mango\u00A0"],
+            ["Go-Go\u200BSqueez"],
+        ]
+        sheet = self._make_sheet(col_a)
+        service = _make_service()
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand",
+                         return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(result["added"], [])
+        self.assertCountEqual(result["skipped"], ["Crunchy Ra-Ra - Mango", "Go-Go Squeez"])
         service.spreadsheets.return_value.batchUpdate.assert_not_called()
 
     # ------------------------------------------------------------------ #
