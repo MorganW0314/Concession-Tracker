@@ -34,11 +34,21 @@ SCOOPS_PER_TUB = 60
 PORK_SCOOPS_PER_BAG = 6
 CHILI_SCOOPS_PER_CAN = 30
 POPCORN_PACKETS_PER_BOX = 36
+GRANOLA_BARS_PER_BOX = 36
 
 # Nacho cheese conversion constants.
 # Delivered in 140oz bags; each nacho serving uses 3oz.
 NACHO_CHEESE_OZ_PER_BAG = 140
 NACHO_CHEESE_OZ_PER_SERVING = 3
+
+# Slushie conversion constants.
+# Inventory is tracked by bag; each bag has 10 servings at 16oz each.
+SLUSHIE_SERVINGS_PER_BAG = 10
+SLUSHIE_BAGS_PER_CONTAINER = 3
+SLUSHIE_OZ_PER_SERVING = 16
+SLUSHIE_OZ_PER_BAG = SLUSHIE_SERVINGS_PER_BAG * SLUSHIE_OZ_PER_SERVING  # = 160oz
+SLUSHIE_SERVINGS_PER_CONTAINER = SLUSHIE_SERVINGS_PER_BAG * SLUSHIE_BAGS_PER_CONTAINER  # = 30
+SLUSHIE_OZ_PER_CONTAINER = SLUSHIE_SERVINGS_PER_CONTAINER * SLUSHIE_OZ_PER_SERVING  # = 480oz
 
 # Chicken salad conversion constants.
 # Delivered in 48oz tubs; each sandwich uses a 4oz scoop (12 scoops per tub).
@@ -615,6 +625,7 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
             for fountain_item in FOUNTAIN_DRINKS
         )
         is_popcorn = item.lower() == "popcorn"
+        is_granola_bar = item.lower() == "granola bar"
         is_nacho_cheese = item.lower() == "nacho cheese"
         is_chicken_salad = item.lower() == "chicken salad"
 
@@ -634,6 +645,9 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         elif is_popcorn:
             qty = packages * POPCORN_PACKETS_PER_BOX
             print(f"  [Deliveries] '{item}': {packages} box(es) → {qty} packets")
+        elif is_granola_bar:
+            qty = packages * GRANOLA_BARS_PER_BOX
+            print(f"  [Deliveries] '{item}': {packages} box(es) → {qty} bars")
         elif is_nacho_cheese:
             qty = packages * NACHO_CHEESE_OZ_PER_BAG
             print(f"  [Deliveries] '{item}': {packages} bag(s) → {qty} oz nacho cheese")
@@ -1446,6 +1460,7 @@ FOUNTAIN_DRINKS = [
     "Big Red",
     "Diet RC",
     "Dr. Pepper",
+    "Lemonade",
     "Root Beer",
     "RC Cola",
     "Coca Cola",
@@ -1477,6 +1492,14 @@ SLUSHIE_MIX = [
     "Slushie Mix",
 ]
 
+SLUSHIE_FLAVORS = [
+    "Slushie - Mango",
+    "Slushie - Blue Raz",
+    "Slushie - Tigers Blood",
+    "Slushie - Green Apple",
+    "Slushie - Peach",
+]
+
 FOOD = [
     "Pizza",
     "Chicken Salad",
@@ -1499,12 +1522,16 @@ SNACKS = [
     "Pita Chips",
     "Assorted Chips",
     "Goldfish",
-    "Crunchy Ra-Ra Yogurt",
+    # Backward-compatible legacy item name: "Crunchy Ra-Ra Yogurt"
+    "Crunchy Ra-Ra - Mango",
+    "Crunchy Ra-Ra - Sprinkles",
+    "Crunchy Ra-Ra - Strawberry",
     "String Cheese",
     "Frozen Grapes",
     "Pickles",
     "Go-Go Squeez",
     "Oranges",
+    "Granola Bar",
     "Popcorn",
 ]
 
@@ -1609,6 +1636,7 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "7up": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
     "Big Red": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
     "Diet RC": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
+    "Lemonade": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY", "Bevelhymer Green", "Bevelhymer Yellow"},
     "RC Cola": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
     "Coca Cola": {"REED ROAD", "TREMONT", "DEVON"},
     "Diet Coke": {"REED ROAD", "TREMONT", "DEVON"},
@@ -1661,6 +1689,7 @@ DEFAULT_CATEGORY_ORDER = [
     ("FOUNTAIN_DRINKS", FOUNTAIN_DRINKS),
     ("BOTTLED_DRINKS", BOTTLED_DRINKS),
     ("SLUSHIE_MIX", SLUSHIE_MIX),
+    ("SLUSHIE_FLAVORS", SLUSHIE_FLAVORS),
     ("FOOD", FOOD),
     ("SNACKS", SNACKS),
     ("DISPOSABLES", DISPOSABLES),
@@ -1676,6 +1705,7 @@ all_categories = {
     "FOUNTAIN_DRINKS": FOUNTAIN_DRINKS,
     "BOTTLED_DRINKS": BOTTLED_DRINKS,
     "SLUSHIE_MIX": SLUSHIE_MIX,
+    "SLUSHIE_FLAVORS": SLUSHIE_FLAVORS,
     "FOOD": FOOD,
     "SNACKS": SNACKS,
     "DISPOSABLES": DISPOSABLES,
@@ -2386,6 +2416,8 @@ def write_modifier_sales_to_week(sheet, service, spreadsheet_id, stand_name, mod
             )
             continue
         qty = mod_data.get("sales", 0)
+        if item_name in SLUSHIE_FLAVORS:
+            qty = round(qty / SLUSHIE_SERVINGS_PER_BAG, 2)
         batch_data.append({
             "range": f"'{stand_name}'!{sales_col}{row_num}",
             "values": [[qty]],

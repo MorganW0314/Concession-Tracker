@@ -16,6 +16,9 @@ COMBO_BREAKDOWN = {
 
 MODIFIER_ITEMS = {
     "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow", "Gatorade - Orange"],
+    "Slushie": [],      # slushie flavors come from modifier CSV
+    "Crunchy Ra-Ra": [],  # crunchy flavors come from modifier CSV
+    "Crunchy Rara": [],   # backward-compatible naming variant
     "Single Dip": [],   # ice cream — flavors come from modifier CSV
     "Double Dip": [],   # ice cream — flavors come from modifier CSV
     "Triple Dip": [],   # ice cream — flavors come from modifier CSV
@@ -28,6 +31,8 @@ MODIFIER_ITEMS = {
 # When a modifier set name contains this prefix the modifier value is used
 # directly as the item name rather than being prefixed with the set name.
 ICE_CREAM_FLAVOR_SET_PREFIX = "Ice Cream Flavor"
+SLUSHIE_FLAVOR_SET_PREFIX = "Slushie Flavor"
+CRUNCHY_RARA_MODIFIER_PREFIX = "Crunchy"
 
 # All Toft's ice cream item names that may appear in the item-sales CSV.
 # These are skipped in take_items() because ice cream is now tracked entirely
@@ -231,6 +236,10 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
         "{base_name} {modifier}"  →  "Gatorade Blue"
     - For ice cream flavor sets (modifier set contains ICE_CREAM_FLAVOR_SET_PREFIX):
         "{modifier}"  →  "Cookie Monster"
+    - For slushie flavor sets (modifier set contains SLUSHIE_FLAVOR_SET_PREFIX):
+        "Slushie - {modifier}"  →  "Slushie - Mango"
+    - For crunchy ra-ra modifier sets (contains "Crunchy" / "Ra-Ra" / "Rara"):
+        "Crunchy Ra-Ra - {modifier}"  →  "Crunchy Ra-Ra - Strawberry"
       Quantities are accumulated across all Ice Cream Flavor N sets so that
       the same flavor appearing in Flavor 1, Flavor 2, and Flavor 3 is summed.
 
@@ -311,8 +320,17 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                 # Flavor 1, Flavor 2, and Flavor 3 are summed into one entry.
                 # For all other modifier sets (e.g. "Gatorade Flavor"),
                 # the item name is "{base_name} {modifier}".
+                modifier_set_lower = modifier_set.lower()
                 if ICE_CREAM_FLAVOR_SET_PREFIX in modifier_set:
                     item_name = modifier
+                elif SLUSHIE_FLAVOR_SET_PREFIX.lower() in modifier_set_lower:
+                    item_name = f"Slushie - {modifier}"
+                elif (
+                    CRUNCHY_RARA_MODIFIER_PREFIX.lower() in modifier_set_lower
+                    or "ra-ra" in modifier_set_lower
+                    or "rara" in modifier_set_lower
+                ):
+                    item_name = f"Crunchy Ra-Ra - {modifier}"
                 else:
                     item_name = f"{base_name} {modifier}"
 
