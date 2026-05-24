@@ -712,8 +712,10 @@ class SyncStandItemListTests(unittest.TestCase):
         delete_start_indexes = []
 
         def capture_batch(spreadsheetId, body):
-            req = body["requests"][0]["deleteDimension"]["range"]
-            delete_start_indexes.append(req["startIndex"])
+            requests = body.get("requests", [])
+            if requests and "deleteDimension" in requests[0]:
+                req = requests[0]["deleteDimension"]["range"]
+                delete_start_indexes.append(req["startIndex"])
             mock = MagicMock()
             mock.execute.return_value = {}
             return mock
