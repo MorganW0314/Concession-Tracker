@@ -40,17 +40,21 @@ from Call_sheets import (
     FOOD,
     FOUNTAIN_DRINKS,
     LOCATION_SPECIFIC_ITEM_STANDS,
+    NOVELTIES,
     SLUSHIE_FLAVORS,
     SNACKS,
 )
 from Take_items import (
     BLOOM_POP_FLAVOR_SET_PREFIX,
+    COMBO_BREAKDOWN,
     CRUNCHY_RARA_MODIFIER_PREFIX,
+    FLOAT_BREAKDOWN,
     HAM_CHICKEN_MODIFIER_SET,
     ICE_CREAM_FLAVOR_SET_PREFIX,
     ICE_CREAM_TOPPINGS_PREFIX,
     MODIFIER_ITEMS,
     POPPI_FLAVOR_SET_PREFIX,
+    RAINBOW_SHERBET_FLOAT_SODA,
     SLUSHIE_FLAVOR_SET_PREFIX,
     _TOFTS_ICE_CREAM_SKIP_ITEMS,
     take_items,
@@ -607,6 +611,164 @@ class CallSheetsAlignmentTests(unittest.TestCase):
             LOCATION_SPECIFIC_ITEM_STANDS[("BOTTLED_DRINKS", "Mt. Dew")],
             {"DEVON", "Bevelhymer Yellow"},
         )
+
+
+class FloatBreakdownTests(unittest.TestCase):
+    """Verify FLOAT_BREAKDOWN constants and take_items() float deduction logic."""
+
+    NON_BEVELHYMER = {
+        "BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)",
+        "NWSC", "PTAC", "REED ROAD", "TREMONT",
+    }
+
+    def test_float_breakdown_keys_present(self):
+        self.assertIn("Root Beer Float", FLOAT_BREAKDOWN)
+        self.assertIn("Rainbow Sherbet Float", FLOAT_BREAKDOWN)
+
+    def test_root_beer_float_components(self):
+        self.assertEqual(FLOAT_BREAKDOWN["Root Beer Float"], ["Root Beer", "Vanilla"])
+
+    def test_rainbow_sherbet_float_default_components(self):
+        self.assertEqual(FLOAT_BREAKDOWN["Rainbow Sherbet Float"], ["Rainbow Sherbet", "7up"])
+
+    def test_rainbow_sherbet_float_soda_by_stand(self):
+        self.assertEqual(RAINBOW_SHERBET_FLOAT_SODA["PTAC"], "Starry")
+        self.assertEqual(RAINBOW_SHERBET_FLOAT_SODA["HILLIARD1 (WEST)"], "7up")
+        self.assertEqual(RAINBOW_SHERBET_FLOAT_SODA["TREMONT"], "7up")
+        self.assertEqual(RAINBOW_SHERBET_FLOAT_SODA["NWSC"], "7up")
+
+    def test_root_beer_float_deducts_components(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Root Beer Float", "Item Variation": "Regular",
+             "Units Sold": "3", "Units Refunded": "1"},
+        ])
+        try:
+            result = take_items(path)
+            # Float item itself is present
+            self.assertIn("Root Beer Float", result)
+            self.assertEqual(result["Root Beer Float"]["sales"], 2)
+            # Components are also deducted
+            self.assertIn("Root Beer", result)
+            self.assertEqual(result["Root Beer"]["sales"], 2)
+            self.assertIn("Vanilla", result)
+            self.assertEqual(result["Vanilla"]["sales"], 2)
+        finally:
+            os.unlink(path)
+
+    def test_rainbow_sherbet_float_deducts_7up_by_default(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Rainbow Sherbet Float", "Item Variation": "Regular",
+             "Units Sold": "2", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertIn("Rainbow Sherbet Float", result)
+            self.assertEqual(result["Rainbow Sherbet Float"]["sales"], 2)
+            self.assertIn("Rainbow Sherbet", result)
+            self.assertEqual(result["Rainbow Sherbet"]["sales"], 2)
+            self.assertIn("7up", result)
+            self.assertEqual(result["7up"]["sales"], 2)
+            self.assertNotIn("Starry", result)
+        finally:
+            os.unlink(path)
+
+    def test_rainbow_sherbet_float_uses_starry_at_ptac(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Rainbow Sherbet Float", "Item Variation": "Regular",
+             "Units Sold": "2", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path, stand_name="PTAC")
+            self.assertIn("Rainbow Sherbet Float", result)
+            self.assertIn("Rainbow Sherbet", result)
+            self.assertIn("Starry", result)
+            self.assertEqual(result["Starry"]["sales"], 2)
+            self.assertNotIn("7up", result)
+        finally:
+            os.unlink(path)
+
+    def test_rainbow_sherbet_float_uses_7up_at_nwsc(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Rainbow Sherbet Float", "Item Variation": "Regular",
+             "Units Sold": "1", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path, stand_name="NWSC")
+            self.assertIn("7up", result)
+            self.assertEqual(result["7up"]["sales"], 1)
+            self.assertNotIn("Starry", result)
+        finally:
+            os.unlink(path)
+
+
+class NewItemsInventoryTests(unittest.TestCase):
+    """Verify new items are present in the correct Call_sheets inventory lists."""
+
+    NON_BEVELHYMER = {
+        "BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)",
+        "NWSC", "PTAC", "REED ROAD", "TREMONT",
+    }
+    BEVELHYMER = {"Bevelhymer Green", "Bevelhymer Yellow"}
+    RAINBOW_SHERBET_FLOAT_STANDS = {"HILLIARD1 (WEST)", "TREMONT", "PTAC", "NWSC"}
+
+    def test_novelties_correct_square_names(self):
+        for item in (
+            "Bomb Pop",
+            "Cannonball!!!",
+            "Cookie Sandwich",
+            "Nerd Bomb Pop",
+            "Power Puff Girl",
+            "Rainbow Sherbet Float",
+            "Reese's Ice Cream",
+            "Root Beer Float",
+            "Snickers Ice Cream Bar",
+            "Sonic The Hedgehog",
+            "Spiderman Ice Cream",
+            "Spongebob Ice Cream",
+            "Strawberry Shortcake Bar",
+            "Sundae Cone",
+            "Twix Ice Cream Bar",
+        ):
+            self.assertIn(item, NOVELTIES, f"{item!r} missing from NOVELTIES")
+
+    def test_food_has_new_items(self):
+        self.assertIn("Chicken Caesar Salad", FOOD)
+        self.assertIn("Hummus and Pita Chips", FOOD)
+
+    def test_snacks_has_new_items(self):
+        for item in (
+            "Cuties (2/$1.00)",
+            "Peanuts Shelled",
+            "Kars",
+            "Clif Bar",
+            "Fig Bars",
+            "Doughnut Packs",
+        ):
+            self.assertIn(item, SNACKS, f"{item!r} missing from SNACKS")
+
+    def test_cannonball_restricted_to_non_bevelhymer(self):
+        self.assertIn("Cannonball!!!", LOCATION_SPECIFIC_ITEM_STANDS)
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["Cannonball!!!"], self.NON_BEVELHYMER)
+
+    def test_root_beer_float_restricted_to_non_bevelhymer(self):
+        self.assertIn("Root Beer Float", LOCATION_SPECIFIC_ITEM_STANDS)
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["Root Beer Float"], self.NON_BEVELHYMER)
+
+    def test_rainbow_sherbet_float_restricted_to_four_stands(self):
+        self.assertIn("Rainbow Sherbet Float", LOCATION_SPECIFIC_ITEM_STANDS)
+        self.assertEqual(
+            LOCATION_SPECIFIC_ITEM_STANDS["Rainbow Sherbet Float"],
+            self.RAINBOW_SHERBET_FLOAT_STANDS,
+        )
+
+    def test_bevelhymer_snacks_restricted_correctly(self):
+        for item in ("Peanuts Shelled", "Kars", "Clif Bar", "Fig Bars", "Doughnut Packs"):
+            self.assertIn(item, LOCATION_SPECIFIC_ITEM_STANDS, f"{item!r} missing from LOCATION_SPECIFIC_ITEM_STANDS")
+            self.assertEqual(
+                LOCATION_SPECIFIC_ITEM_STANDS[item],
+                self.BEVELHYMER,
+                f"{item!r} should be restricted to Bevelhymer stands only",
+            )
 
 
 if __name__ == "__main__":
