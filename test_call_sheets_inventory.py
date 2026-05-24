@@ -730,6 +730,7 @@ class SyncStandItemListTests(unittest.TestCase):
             )
 
         self.assertEqual(delete_start_indexes, [3, 2])
+        self.assertNotIn(1, delete_start_indexes)
 
     def test_new_item_format_explicitly_sets_white_background_style(self):
         category_order = [("CAT_A", ["Apple", "Banana"])]
