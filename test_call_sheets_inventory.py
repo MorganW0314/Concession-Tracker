@@ -666,7 +666,8 @@ class SyncStandItemListTests(unittest.TestCase):
         self.assertEqual(result["removed"], ["Obsolete Item"])
         self.assertTrue(any("deleteDimension" in request for request in batch_requests))
 
-    def test_removes_blank_col_a_row_with_week_data(self):
+    def test_leaves_blank_col_a_row_with_week_data_alone(self):
+        """Blank Column A rows must never be deleted, even if they have week data."""
         category_order = [("CAT_A", ["Apple"])]
         full_grid = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["", "WeekData"]]
         col_a = [[row[0] if row else ""] for row in full_grid]
@@ -701,10 +702,11 @@ class SyncStandItemListTests(unittest.TestCase):
                 sheet, service, self.SPREADSHEET_ID, self.STAND
             )
 
-        self.assertEqual(result["removed"], ["<blank>"])
-        self.assertTrue(any("deleteDimension" in request for request in batch_requests))
+        self.assertEqual(result["removed"], [])
+        self.assertFalse(any("deleteDimension" in request for request in batch_requests))
 
-    def test_removes_fully_empty_row(self):
+    def test_leaves_fully_empty_row_alone(self):
+        """Fully empty rows (no Column A value) must be skipped, not deleted."""
         category_order = [("CAT_A", ["Apple"])]
         full_grid = [["ITEM"], [""], ["CAT_A"], ["Apple"], []]
         col_a = [[row[0] if row else ""] for row in full_grid]
@@ -739,8 +741,8 @@ class SyncStandItemListTests(unittest.TestCase):
                 sheet, service, self.SPREADSHEET_ID, self.STAND
             )
 
-        self.assertEqual(result["removed"], ["<blank>"])
-        self.assertTrue(any("deleteDimension" in request for request in batch_requests))
+        self.assertEqual(result["removed"], [])
+        self.assertFalse(any("deleteDimension" in request for request in batch_requests))
 
     def test_deletion_expected_set_uses_canonical_defaults_not_master_augmented_order(self):
         col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["Obsolete Item"]]
