@@ -7,33 +7,52 @@ from item_name_utils import normalize_item_name
 
 COMBO_BREAKDOWN = {
     "Chili Cheese Dog Combo Meal": ["Chili Cheese Dog", "Assorted Chips"],
+    "Chili Cheese Dog COMBO": ["Chili Cheese Dog", "Assorted Chips"],
     "Uncrustable Combo Meal": ["Uncrustable", "Assorted Chips"],
+    "Uncrustable COMBO": ["Uncrustable", "Assorted Chips"],
     "Chicken Salad Combo Meal": ["Chicken Salad Sandwich", "Assorted Chips"],
-    "Combo Meal 3": ["Chicken Salad", "Assorted Chips"],
-    "Ham and Cheese Combo Meal": ["Ham and Cheese", "Assorted Chips"],
+    "Combo Meal 3": ["Chicken Salad Sandwich", "Assorted Chips"],
+    # Sandwich quantity comes from the modifier-sales CSV via
+    # "Ham Sandwich OR Chicken Salad"; only the chips come from the combo row.
+    "Chicken Salad OR Ham Sandwich COMBO": ["Assorted Chips"],
+    "Ham and Cheese Combo Meal": ["Ham & Cheese Sandwich", "Assorted Chips"],
     "Hot Dog Combo Meal": ["Hot Dog", "Assorted Chips"],
-    "Pizza Combo Meal": ["Pizza", "Assorted Chips"],
-    "Whole Jet's Pizza": ["Pizza", "Pizza", "Pizza", "Pizza", "Pizza", "Pizza", "Pizza", "Pizza"],
-    "Pulled Pork Combo Meal": ["Pulled Pork", "Assorted Chips"],
+    "Hot Dog COMBO": ["Hot Dog", "Assorted Chips"],
+    "Pizza Combo Meal": ["Pizza Slice", "Assorted Chips"],
+    "Pizza COMBO": ["Pizza Slice", "Assorted Chips"],
+    "Whole Jet's Pizza": ["Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice"],
+    "Pulled Pork Combo Meal": ["Pulled Pork Sandwich", "Assorted Chips"],
+    "Pulled Pork COMBO": ["Pulled Pork Sandwich", "Assorted Chips"],
 }
 
 MODIFIER_ITEMS = {
-    "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow", "Gatorade - Orange"],
-    "Toppings": [],  # values come from modifier CSV (e.g., Sprinkles, Whipped Cream)
-    "Topping": [],  # variant modifier-set naming
+    "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow"],
+    "Ice Cream Toppings": [],
+    "Toppings": [],  # legacy Square naming variant; values come from modifier CSV
+    "Topping": [],  # legacy Square naming variant; values come from modifier CSV
+    "Fountain Drink Flavor": [],
     "Fountain Drink": [],  # flavors come from modifier CSV
     "Fountain": [],  # variant modifier-set naming
-    "Iced Coffee": [],  # flavor modifiers map to La Colombe inventory rows
+    "Fountain Soda": [],
+    "Ham Sandwich OR Chicken Salad": [],
+    "Iced Coffee": [],
     "La Colombe": [],  # variant modifier-set naming
-    "Chocolate Bar": [],  # Bevelhymer-only flavor modifiers
-    "Soda Can": [],  # TODO: add soda can flavors when confirmed
-    "Sunflower Seeds": [],  # TODO: add sunflower seed flavors when confirmed
+    "Chocolate Bar Flavor": [],
+    "Chocolate Bars": [],
+    "M&Ms Flavor": [],
+    "M&Ms": [],
+    "Soda Can": [],
+    "Soda can": [],
+    "Sunflower Seed Flavors": [],
+    "Sunflower Seeds": [],
     "Bloom Pop": [],    # Bloom Pop flavors come from modifier CSV
     "Poppi": [],        # Poppi flavors come from modifier CSV
     "Slushie": [],      # slushie flavors come from modifier CSV
+    "Flavor": [],       # alternate Square display name for slushie modifiers
     "Crunchy Ra-Ra": [],  # crunchy flavors come from modifier CSV
     "Crunchy Rara": [],   # backward-compatible naming variant
     "Crunchy Ra-Ra Yogurt": [],  # legacy base name kept for backward compatibility
+    "Single-Dip": [],
     "Single Dip": [],   # ice cream — flavors come from modifier CSV
     "Double Dip": [],   # ice cream — flavors come from modifier CSV
     "Triple Dip": [],   # ice cream — flavors come from modifier CSV
@@ -46,11 +65,13 @@ MODIFIER_ITEMS = {
 # When a modifier set name contains this prefix the modifier value is used
 # directly as the item name rather than being prefixed with the set name.
 ICE_CREAM_FLAVOR_SET_PREFIX = "Ice Cream Flavor"
-SLUSHIE_FLAVOR_SET_PREFIX = "Slushie Flavor"
+SLUSHIE_FLAVOR_SET_PREFIX = "Slushie"
 CRUNCHY_RARA_MODIFIER_PREFIX = "Crunchy"
 CRUNCHY_RARA_MODIFIER_KEYS = {"Crunchy Ra-Ra", "Crunchy Rara", "Crunchy Ra-Ra Yogurt"}
 BLOOM_POP_FLAVOR_SET_PREFIX = "Bloom Pop"
 POPPI_FLAVOR_SET_PREFIX = "Poppi"
+ICE_CREAM_TOPPINGS_PREFIX = "Ice Cream Toppings"
+HAM_CHICKEN_MODIFIER_SET = "Ham Sandwich OR Chicken Salad"
 SLUSHIE_FLAVOR_SET_PREFIX_LOWER = SLUSHIE_FLAVOR_SET_PREFIX.lower()
 CRUNCHY_RARA_MODIFIER_PREFIX_LOWER = CRUNCHY_RARA_MODIFIER_PREFIX.lower()
 BLOOM_POP_FLAVOR_SET_PREFIX_LOWER = BLOOM_POP_FLAVOR_SET_PREFIX.lower()
@@ -64,7 +85,8 @@ POPPI_FLAVOR_SET_PREFIX_LOWER = POPPI_FLAVOR_SET_PREFIX.lower()
 _TOFTS_ICE_CREAM_SKIP_ITEMS: frozenset = frozenset({
     # Base flavors
     "Brownie Bandit", "Birthday Cake", "Chocolate", "Cookie Dough",
-    "Cookie Monster", "Cookies n' Cream", "Vanilla", "Cotton Candy Ice Cream",
+    # Keep both Cotton Candy names because Square/POS exports have used both.
+    "Cookie Monster", "Cookies n' Cream", "Vanilla", "Cotton Candy", "Cotton Candy Ice Cream",
     "Mint Chip", "Rainbow Sherbet", "PB S'Mores", "Blueberry Waffle Cone",
     # Scoop variants
     "Brownie Bandit Single Scoop", "Brownie Bandit Double Scoop", "Brownie Bandit Triple Scoop",
@@ -353,7 +375,9 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                 modifier_set_lower = modifier_set.lower()
                 if ICE_CREAM_FLAVOR_SET_PREFIX in modifier_set:
                     item_name = modifier
-                elif SLUSHIE_FLAVOR_SET_PREFIX_LOWER in modifier_set_lower:
+                # Some stands export the slushie modifier set as the bare display
+                # name "Flavor"; treat it the same as the explicit "Slushie" set.
+                elif modifier_set == "Flavor" or SLUSHIE_FLAVOR_SET_PREFIX_LOWER in modifier_set_lower:
                     item_name = f"Slushie - {modifier}"
                 elif (
                     base_name in CRUNCHY_RARA_MODIFIER_KEYS
@@ -366,23 +390,30 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                     item_name = f"Poppi - {modifier}"
                 elif base_name == "Gatorade":
                     item_name = f"Gatorade - {modifier}"
-                elif "topping" in modifier_set_lower:
+                elif base_name in {ICE_CREAM_TOPPINGS_PREFIX, "Toppings", "Topping"}:
                     item_name = modifier
-                elif base_name in {"Fountain Drink", "Fountain"}:
-                    item_name = modifier
-                elif base_name in {"Iced Coffee", "La Colombe"}:
-                    item_name = f"La Colombe - {modifier}"
-                elif base_name == "Chocolate Bar":
-                    modifier_lower = modifier.lower()
-                    if modifier_lower.startswith("m&m"):
-                        if "peanut" in modifier_lower:
-                            item_name = "M&M - Peanut"
-                        elif "regular" in modifier_lower or "plain" in modifier_lower:
-                            item_name = "M&M - Regular"
-                        else:
-                            item_name = "M&M"
+                elif base_name in {"Fountain Drink Flavor", "Fountain Drink", "Fountain"}:
+                    if modifier == "RC":
+                        item_name = "RC Cola"
+                    elif modifier == "Coke":
+                        item_name = "Coca Cola"
                     else:
                         item_name = modifier
+                elif base_name == HAM_CHICKEN_MODIFIER_SET:
+                    if modifier == "Ham Sandwich":
+                        item_name = "Ham & Cheese Sandwich"
+                    else:
+                        item_name = modifier
+                elif base_name in {"Iced Coffee", "La Colombe"}:
+                    item_name = f"Iced Coffee - {modifier}"
+                elif base_name in {"Chocolate Bar Flavor", "Chocolate Bars"}:
+                    item_name = modifier
+                elif base_name in {"M&Ms Flavor", "M&Ms"}:
+                    item_name = f"M&M - {modifier}"
+                elif base_name in {"Soda Can", "Soda can"}:
+                    item_name = modifier
+                elif base_name in {"Sunflower Seed Flavors", "Sunflower Seeds"}:
+                    item_name = f"Sunflower Seeds - {modifier}"
                 else:
                     item_name = f"{base_name} {modifier}"
 

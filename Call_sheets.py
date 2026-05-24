@@ -794,7 +794,7 @@ def _build_category_order_for_stand(sheet, spreadsheet_id, stand_name):
         canonical_item = _canonical_item_name(item)
         if not canonical_item:
             continue
-        if not _is_item_available_at_stand(canonical_item, stand_name):
+        if not _is_item_available_at_stand(canonical_item, stand_name, category):
             continue
         category_map.setdefault(category, [])
         if canonical_item not in category_map[category]:
@@ -1528,6 +1528,7 @@ FOUNTAIN_DRINKS = [
     "Coca Cola",
     "Diet Coke",
     "Diet Pepsi",
+    "Mt. Dew",
     "Pepsi",
     "Starry",
 ]
@@ -1537,7 +1538,6 @@ BOTTLED_DRINKS = [
     "Gatorade - Red",
     "Gatorade - Blue",
     "Gatorade - Yellow",
-    "Gatorade - Orange",
     "Bloom Pop - Strawberry Cream",
     "Bloom Pop - Raspberry Lemonade",
     "Bloom Pop - Watermelon Lime",
@@ -1545,27 +1545,41 @@ BOTTLED_DRINKS = [
     "Poppi - Wild Berry",
     "Poppi - Raspberry Rose",
     "Fairlife Protein",
-    "La Colombe - Vanilla",
-    "La Colombe - Mocha",
-    "La Colombe - Caramel",
-    "Soda Can",  # TODO: placeholder item until soda can flavors are confirmed
+    "Iced Coffee - Vanilla",
+    "Iced Coffee - Mocha",
+    "Iced Coffee - Caramel",
+    "Diet Mt. Dew",
+    "Mt. Dew",
+    "Squirt",
+    "Dr. Pepper",
+    "Bubly - Green",
+    "Bubly - Red",
+    "Coca Cola",
+    "Zero Sugar RC",
+    "RC",
+    "Sprite",
+    "7UP",
+    "Sunkist - Orange",
+    "AW Root Beer",
 ]
 
 
 
 SLUSHIE_FLAVORS = [
     "Slushie - Mango",
-    "Slushie - Blue Raz",
-    "Slushie - Tigers Blood",
+    "Slushie - Blue Razz",
+    "Slushie - Tiger's Blood",
     "Slushie - Green Apple",
     "Slushie - Peach",
 ]
 
 FOOD = [
-    "Pizza",
-    "Chicken Salad",
-    "Ham and Cheese",
+    "Pizza Slice",
+    "Chicken Salad Sandwich",
+    "Ham & Cheese Sandwich",
     "Hot Dog",
+    "Chili Cheese Dog",
+    "Pulled Pork Sandwich",
     "Chili Sauce (cans)",
     "Pulled Pork (bags)",
     "Uncrustable",
@@ -1590,9 +1604,11 @@ SNACKS = [
     "Crunchy Ra-Ra - Mango",
     "Crunchy Ra-Ra - Sprinkles",
     "Crunchy Ra-Ra - Strawberry",
-    "Sprinkles",
+    "Rainbow Sprinkles",
     "Whipped Cream",
-    "Sunflower Seeds",  # TODO: placeholder item until sunflower seed flavors are confirmed
+    "Sunflower Seeds - Original",
+    "Sunflower Seeds - Dill Pickle",
+    "Sunflower Seeds - Ranch",
     "String Cheese",
     "Frozen Grapes",
     "Pickles",
@@ -1674,6 +1690,7 @@ INGREDIENT_MAP = {
     "Pulled Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork (bags)", 1)],
     "BBQ Pork Sandwich": [("Hamburger Buns", 1), ("Pulled Pork (bags)", 1)],
     "Ham and Cheese Sandwich": [("Hamburger Buns", 1), ("Ham", 1), ("Cheese", 1)],
+    "Ham & Cheese Sandwich": [("Hamburger Buns", 1), ("Ham", 1), ("Cheese", 1)],
 
     # Hot dogs / chili use
     "Hot Dog": [("Hot Dog Buns", 1)],
@@ -1698,47 +1715,94 @@ PREMIUM_ICE_CREAM_ITEMS = {
 }
 
 PREMIUM_ICE_CREAM_STANDS = {"PTAC", "NWSC", "TREMONT", "HILLIARD1 (WEST)"}
-
+ALL_STANDS = {
+    "BEXLEY",
+    "DEVON",
+    "HILLIARD2 (EAST)",
+    "HILLIARD1 (WEST)",
+    "NWSC",
+    "PTAC",
+    "REED ROAD",
+    "TREMONT",
+    "Bevelhymer Green",
+    "Bevelhymer Yellow",
+}
+BEVELHYMER_STANDS = {"Bevelhymer Green", "Bevelhymer Yellow"}
+NON_BEVELHYMER_STANDS = ALL_STANDS - BEVELHYMER_STANDS
+UA_AND_NWSC_FOUNTAIN_STANDS = {"BEXLEY", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC"}
+UA_FOUNTAIN_STANDS = {"DEVON", "REED ROAD", "TREMONT"}
+BLOOM_POP_STANDS = {
+    "BEXLEY",
+    "DEVON",
+    "HILLIARD2 (EAST)",
+    "HILLIARD1 (WEST)",
+    "NWSC",
+    "REED ROAD",
+    "TREMONT",
+}
+PTAC_ONLY = {"PTAC"}
+HAM_SANDWICH_STANDS = NON_BEVELHYMER_STANDS
+MMS_STANDS = {"HILLIARD2 (EAST)", "Bevelhymer Yellow"}
+CHOCOLATE_BAR_STANDS = BEVELHYMER_STANDS
+SODA_CAN_STANDS = {"DEVON", "Bevelhymer Yellow"}
+SUNFLOWER_SEED_STANDS = {"HILLIARD2 (EAST)", "Bevelhymer Yellow"}
 LOCATION_SPECIFIC_ITEM_STANDS = {
-    "7up": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
-    "Big Red": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
-    "Diet RC": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
-    "Lemonade": {
-        "REED ROAD",
-        "TREMONT",
-        "DEVON",
-        "NWSC",
-        "HILLIARD2 (EAST)",
-        "HILLIARD1 (WEST)",
-        "BEXLEY",
-        "Bevelhymer Green",
-        "Bevelhymer Yellow",
-    },
-    "RC Cola": {"REED ROAD", "TREMONT", "DEVON", "NWSC", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "BEXLEY"},
-    "Coca Cola": {"REED ROAD", "TREMONT", "DEVON"},
-    "Diet Coke": {"REED ROAD", "TREMONT", "DEVON"},
-    "Diet Coke - UA ONLY": {"REED ROAD", "TREMONT", "DEVON"},
-    "Diet Pepsi": {"PTAC"},
-    "Pepsi": {"PTAC"},
-    "Starry": {"PTAC"},
-    "Poppi - Watermelon": {"PTAC"},
-    "Poppi - Wild Berry": {"PTAC"},
-    "Poppi - Raspberry Rose": {"PTAC"},
+    ("FOUNTAIN_DRINKS", "7up"): UA_AND_NWSC_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "Big Red"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "Diet RC"): UA_AND_NWSC_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "Dr. Pepper"): NON_BEVELHYMER_STANDS,
+    ("FOUNTAIN_DRINKS", "Lemonade"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "Root Beer"): NON_BEVELHYMER_STANDS,
+    ("FOUNTAIN_DRINKS", "RC Cola"): UA_AND_NWSC_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "Coca Cola"): UA_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "Diet Coke"): UA_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "Diet Pepsi"): PTAC_ONLY,
+    ("FOUNTAIN_DRINKS", "Mt. Dew"): PTAC_ONLY,
+    ("FOUNTAIN_DRINKS", "Pepsi"): PTAC_ONLY,
+    ("FOUNTAIN_DRINKS", "Starry"): PTAC_ONLY,
+    "Poppi - Watermelon": PTAC_ONLY,
+    "Poppi - Wild Berry": PTAC_ONLY,
+    "Poppi - Raspberry Rose": PTAC_ONLY,
     "Popcorn": {"TREMONT", "REED ROAD", "NWSC"},
-    "Milky Way": {"Bevelhymer Green", "Bevelhymer Yellow"},
-    "Twix": {"Bevelhymer Green", "Bevelhymer Yellow"},
-    "Snickers": {"Bevelhymer Green", "Bevelhymer Yellow"},
-    "M&M - Peanut": {"Bevelhymer Green", "Bevelhymer Yellow"},
-    "M&M - Regular": {"Bevelhymer Green", "Bevelhymer Yellow"},
-    "Soda Can": {"Bevelhymer Green", "Bevelhymer Yellow"},
-    "Sunflower Seeds": {"Bevelhymer Green", "Bevelhymer Yellow"},
-    "Bloom Pop - Strawberry Cream":    {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
-    "Bloom Pop - Raspberry Lemonade":  {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
-    "Bloom Pop - Watermelon Lime":     {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
+    "Milky Way": CHOCOLATE_BAR_STANDS,
+    "Twix": CHOCOLATE_BAR_STANDS,
+    "Snickers": CHOCOLATE_BAR_STANDS,
+    "M&M - Peanut": MMS_STANDS,
+    "M&M - Regular": MMS_STANDS,
+    "Bloom Pop - Strawberry Cream": BLOOM_POP_STANDS,
+    "Bloom Pop - Raspberry Lemonade": BLOOM_POP_STANDS,
+    "Bloom Pop - Watermelon Lime": BLOOM_POP_STANDS,
+    "Iced Coffee - Vanilla": BLOOM_POP_STANDS,
+    "Iced Coffee - Mocha": BLOOM_POP_STANDS,
+    "Iced Coffee - Caramel": BLOOM_POP_STANDS,
+    "Ham & Cheese Sandwich": HAM_SANDWICH_STANDS,
+    ("BOTTLED_DRINKS", "Diet Mt. Dew"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "Mt. Dew"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "Squirt"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "Dr. Pepper"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "Bubly - Green"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "Bubly - Red"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "Coca Cola"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "Zero Sugar RC"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "RC"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "Sprite"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "7UP"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "Sunkist - Orange"): SODA_CAN_STANDS,
+    ("BOTTLED_DRINKS", "AW Root Beer"): SODA_CAN_STANDS,
+    "Sunflower Seeds - Original": SUNFLOWER_SEED_STANDS,
+    "Sunflower Seeds - Dill Pickle": SUNFLOWER_SEED_STANDS,
+    "Sunflower Seeds - Ranch": SUNFLOWER_SEED_STANDS,
 }
 
 
-def _is_item_available_at_stand(item_name, stand_name):
+def _is_item_available_at_stand(item_name, stand_name, category_name=None):
+    """Return whether an item should appear for a stand.
+
+    When category_name is provided, category-specific location overrides stored
+    as (category_name, item_name) tuple keys take precedence over plain item
+    name keys. This allows the same display name to be restricted differently
+    across categories (for example fountain vs bottled soda rows).
+    """
     if not stand_name:
         return True
 
@@ -1746,6 +1810,10 @@ def _is_item_available_at_stand(item_name, stand_name):
         return stand_name in PREMIUM_ICE_CREAM_STANDS
 
     canonical_item = _canonical_item_name(item_name)
+    if category_name:
+        allowed_stands = LOCATION_SPECIFIC_ITEM_STANDS.get((category_name, canonical_item))
+        if allowed_stands is not None:
+            return stand_name in allowed_stands
     allowed_stands = LOCATION_SPECIFIC_ITEM_STANDS.get(canonical_item)
     if allowed_stands is not None:
         return stand_name in allowed_stands
@@ -1758,7 +1826,7 @@ def get_default_category_order_for_stand(stand_name):
     for category_name, item_list in DEFAULT_CATEGORY_ORDER:
         filtered_items = [
             item for item in item_list
-            if _is_item_available_at_stand(item, stand_name)
+            if _is_item_available_at_stand(item, stand_name, category_name)
         ]
         if filtered_items:
             stand_category_order.append((category_name, filtered_items))

@@ -1,12 +1,54 @@
 import csv
 import os
+import sys
 import tempfile
+import types
 import unittest
 
+
+def _install_google_stubs():
+    google_mod = types.ModuleType("google")
+    oauth2_mod = types.ModuleType("google.oauth2")
+    service_account_mod = types.ModuleType("google.oauth2.service_account")
+
+    class _Credentials:
+        @staticmethod
+        def from_service_account_file(*args, **kwargs):
+            return object()
+
+    service_account_mod.Credentials = _Credentials
+
+    googleapiclient_mod = types.ModuleType("googleapiclient")
+    discovery_mod = types.ModuleType("googleapiclient.discovery")
+
+    def _build(*args, **kwargs):
+        return object()
+
+    discovery_mod.build = _build
+
+    sys.modules.setdefault("google", google_mod)
+    sys.modules.setdefault("google.oauth2", oauth2_mod)
+    sys.modules.setdefault("google.oauth2.service_account", service_account_mod)
+    sys.modules.setdefault("googleapiclient", googleapiclient_mod)
+    sys.modules.setdefault("googleapiclient.discovery", discovery_mod)
+
+
+_install_google_stubs()
+
+from Call_sheets import (
+    BOTTLED_DRINKS,
+    FOOD,
+    FOUNTAIN_DRINKS,
+    LOCATION_SPECIFIC_ITEM_STANDS,
+    SLUSHIE_FLAVORS,
+    SNACKS,
+)
 from Take_items import (
     BLOOM_POP_FLAVOR_SET_PREFIX,
     CRUNCHY_RARA_MODIFIER_PREFIX,
+    HAM_CHICKEN_MODIFIER_SET,
     ICE_CREAM_FLAVOR_SET_PREFIX,
+    ICE_CREAM_TOPPINGS_PREFIX,
     MODIFIER_ITEMS,
     POPPI_FLAVOR_SET_PREFIX,
     SLUSHIE_FLAVOR_SET_PREFIX,
@@ -46,26 +88,35 @@ class ModifierItemsConstantTests(unittest.TestCase):
         self.assertIn("Gatorade", MODIFIER_ITEMS)
         self.assertEqual(
             MODIFIER_ITEMS["Gatorade"],
-            ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow", "Gatorade - Orange"],
+            ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow"],
         )
+        self.assertNotIn("Gatorade - Orange", MODIFIER_ITEMS["Gatorade"])
 
     def test_slushie_and_crunchy_items_in_modifier_items(self):
         self.assertIn("Slushie", MODIFIER_ITEMS)
+        self.assertIn("Flavor", MODIFIER_ITEMS)
         self.assertIn("Crunchy Ra-Ra", MODIFIER_ITEMS)
         self.assertIn("Crunchy Rara", MODIFIER_ITEMS)
         self.assertIn("Crunchy Ra-Ra Yogurt", MODIFIER_ITEMS)
 
     def test_new_modifier_items_added(self):
         for item in (
-            "Toppings",
-            "Fountain Drink",
+            "Ice Cream Toppings",
+            "Fountain Drink Flavor",
+            "Fountain Soda",
+            HAM_CHICKEN_MODIFIER_SET,
             "Iced Coffee",
-            "La Colombe",
-            "Chocolate Bar",
+            "Chocolate Bar Flavor",
+            "Chocolate Bars",
+            "M&Ms Flavor",
+            "M&Ms",
             "Soda Can",
+            "Soda can",
+            "Sunflower Seed Flavors",
             "Sunflower Seeds",
             "Bloom Pop",
             "Poppi",
+            "Single-Dip",
         ):
             self.assertIn(item, MODIFIER_ITEMS)
 
@@ -73,17 +124,21 @@ class ModifierItemsConstantTests(unittest.TestCase):
         self.assertEqual(ICE_CREAM_FLAVOR_SET_PREFIX, "Ice Cream Flavor")
 
     def test_new_modifier_prefix_constants(self):
-        self.assertEqual(SLUSHIE_FLAVOR_SET_PREFIX, "Slushie Flavor")
+        self.assertEqual(SLUSHIE_FLAVOR_SET_PREFIX, "Slushie")
         self.assertEqual(CRUNCHY_RARA_MODIFIER_PREFIX, "Crunchy")
         self.assertEqual(BLOOM_POP_FLAVOR_SET_PREFIX, "Bloom Pop")
         self.assertEqual(POPPI_FLAVOR_SET_PREFIX, "Poppi")
+        self.assertEqual(ICE_CREAM_TOPPINGS_PREFIX, "Ice Cream Toppings")
+        self.assertEqual(HAM_CHICKEN_MODIFIER_SET, "Ham Sandwich OR Chicken Salad")
 
     def test_tofts_skip_items_includes_base_flavors(self):
         for flavor in ("Cookie Monster", "Blueberry Waffle Cone", "Vanilla", "Chocolate",
                        "Cookie Dough", "Brownie Bandit", "Birthday Cake", "Mint Chip",
-                       "Rainbow Sherbet", "PB S'Mores", "Cotton Candy Ice Cream",
-                       "Cookies n' Cream"):
+                       "Rainbow Sherbet", "PB S'Mores", "Cookies n' Cream"):
             self.assertIn(flavor, _TOFTS_ICE_CREAM_SKIP_ITEMS)
+        # Square/POS exports have used both Cotton Candy names; keep both skipped.
+        self.assertIn("Cotton Candy", _TOFTS_ICE_CREAM_SKIP_ITEMS)
+        self.assertIn("Cotton Candy Ice Cream", _TOFTS_ICE_CREAM_SKIP_ITEMS)
 
     def test_tofts_skip_items_includes_scoop_variants(self):
         for variant in (
@@ -118,12 +173,15 @@ class TakeItemsSkipTests(unittest.TestCase):
         path = _write_tmp_csv([
             {"Item Name": "Single Dip", "Item Variation": "Regular",
              "Units Sold": "3", "Units Refunded": "0"},
+            {"Item Name": "Single-Dip", "Item Variation": "Regular",
+             "Units Sold": "2", "Units Refunded": "0"},
             {"Item Name": "Hot Dog", "Item Variation": "Regular",
              "Units Sold": "2", "Units Refunded": "0"},
         ])
         try:
             result = take_items(path)
             self.assertNotIn("Single Dip", result)
+            self.assertNotIn("Single-Dip", result)
             self.assertIn("Hot Dog", result)
             self.assertEqual(result["Hot Dog"]["sales"], 2)
         finally:
@@ -202,21 +260,25 @@ class TakeItemsSkipTests(unittest.TestCase):
 
     def test_new_modifier_base_items_are_skipped(self):
         path = _write_tmp_csv([
-            {"Item Name": "Toppings", "Item Variation": "Regular", "Units Sold": "4", "Units Refunded": "0"},
-            {"Item Name": "Fountain Drink", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "0"},
+            {"Item Name": "Ice Cream Toppings", "Item Variation": "Regular", "Units Sold": "4", "Units Refunded": "0"},
+            {"Item Name": "Fountain Soda", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "0"},
+            {"Item Name": "Ham Sandwich OR Chicken Salad", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
             {"Item Name": "Iced Coffee", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
-            {"Item Name": "Chocolate Bar", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
-            {"Item Name": "Soda Can", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
+            {"Item Name": "Chocolate Bars", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
+            {"Item Name": "M&Ms", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
+            {"Item Name": "Soda can", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
             {"Item Name": "Sunflower Seeds", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
             {"Item Name": "Hot Dog", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
         ])
         try:
             result = take_items(path)
-            self.assertNotIn("Toppings", result)
-            self.assertNotIn("Fountain Drink", result)
+            self.assertNotIn("Ice Cream Toppings", result)
+            self.assertNotIn("Fountain Soda", result)
+            self.assertNotIn("Ham Sandwich OR Chicken Salad", result)
             self.assertNotIn("Iced Coffee", result)
-            self.assertNotIn("Chocolate Bar", result)
-            self.assertNotIn("Soda Can", result)
+            self.assertNotIn("Chocolate Bars", result)
+            self.assertNotIn("M&Ms", result)
+            self.assertNotIn("Soda can", result)
             self.assertNotIn("Sunflower Seeds", result)
             self.assertEqual(result["Hot Dog"]["sales"], 2)
         finally:
@@ -241,17 +303,20 @@ class TakeItemsSkipTests(unittest.TestCase):
             os.unlink(path)
 
 
+    def test_new_combo_breakdown_items_are_expanded(self):
         path = _write_tmp_csv([
-            {"Item Name": "Combo Meal 3", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "1"},
-            {"Item Name": "Ham and Cheese Combo Meal", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
+            {"Item Name": "Pizza COMBO", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "1"},
+            {"Item Name": "Pulled Pork COMBO", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
+            {"Item Name": "Chicken Salad OR Ham Sandwich COMBO", "Item Variation": "Regular", "Units Sold": "4", "Units Refunded": "1"},
         ])
         try:
             result = take_items(path)
-            self.assertEqual(result["Chicken Salad"]["sales"], 2)
-            self.assertEqual(result["Ham and Cheese"]["sales"], 2)
-            self.assertEqual(result["Assorted Chips"]["sales"], 4)
-            self.assertNotIn("Combo Meal 3", result)
-            self.assertNotIn("Ham and Cheese Combo Meal", result)
+            self.assertEqual(result["Pizza Slice"]["sales"], 2)
+            self.assertEqual(result["Pulled Pork Sandwich"]["sales"], 2)
+            self.assertEqual(result["Assorted Chips"]["sales"], 7)
+            self.assertNotIn("Pizza COMBO", result)
+            self.assertNotIn("Pulled Pork COMBO", result)
+            self.assertNotIn("Chicken Salad OR Ham Sandwich COMBO", result)
         finally:
             os.unlink(path)
 
@@ -353,8 +418,8 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
 
     def test_slushie_flavor_modifier_uses_slushie_dash_name(self):
         path = _write_tmp_csv([
-            {"Modifier Set": "Slushie Flavor", "Modifier": "Mango", "Qty Sold": "3", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Slushie Flavor", "Modifier": "Mango", "Qty Sold": "2", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Slushie", "Modifier": "Mango", "Qty Sold": "3", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Flavor", "Modifier": "Mango", "Qty Sold": "2", "Gross Sales": "$0.00"},
         ])
         try:
             result = take_modifiers(path)
@@ -375,34 +440,40 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
 
     def test_new_modifier_set_name_construction(self):
         path = _write_tmp_csv([
-            {"Modifier Set": "Toppings", "Modifier": "Sprinkles", "Qty Sold": "3", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Topping Options", "Modifier": "Whipped Cream", "Qty Sold": "2", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Fountain Drink Flavor", "Modifier": "Dr. Pepper", "Qty Sold": "4", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Iced Coffee Flavor", "Modifier": "Mocha", "Qty Sold": "5", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Chocolate Bar", "Modifier": "Milky Way", "Qty Sold": "1", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Chocolate Bar", "Modifier": "M&M Peanut", "Qty Sold": "2", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Chocolate Bar", "Modifier": "M&M Regular", "Qty Sold": "3", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Ice Cream Toppings", "Modifier": "Rainbow Sprinkles", "Qty Sold": "3", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Fountain Drink Flavor", "Modifier": "RC", "Qty Sold": "4", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Fountain Drink Flavor", "Modifier": "Coke", "Qty Sold": "2", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Ham Sandwich OR Chicken Salad", "Modifier": "Ham Sandwich", "Qty Sold": "5", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Ham Sandwich OR Chicken Salad", "Modifier": "Chicken Salad Sandwich", "Qty Sold": "1", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Iced Coffee", "Modifier": "Mocha", "Qty Sold": "5", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Chocolate Bar Flavor", "Modifier": "Milky Way", "Qty Sold": "1", "Gross Sales": "$0.00"},
+            {"Modifier Set": "M&Ms Flavor", "Modifier": "Peanut", "Qty Sold": "2", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Soda Can", "Modifier": "Sprite", "Qty Sold": "3", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Sunflower Seed Flavors", "Modifier": "Dill Pickle", "Qty Sold": "2", "Gross Sales": "$0.00"},
         ])
         try:
             result = take_modifiers(path)
-            self.assertEqual(result["Sprinkles"]["sales"], 3)
-            self.assertEqual(result["Whipped Cream"]["sales"], 2)
-            self.assertEqual(result["Dr. Pepper"]["sales"], 4)
-            self.assertEqual(result["La Colombe - Mocha"]["sales"], 5)
+            self.assertEqual(result["Rainbow Sprinkles"]["sales"], 3)
+            self.assertEqual(result["RC Cola"]["sales"], 4)
+            self.assertEqual(result["Coca Cola"]["sales"], 2)
+            self.assertEqual(result["Ham & Cheese Sandwich"]["sales"], 5)
+            self.assertEqual(result["Chicken Salad Sandwich"]["sales"], 1)
+            self.assertEqual(result["Iced Coffee - Mocha"]["sales"], 5)
             self.assertEqual(result["Milky Way"]["sales"], 1)
             self.assertEqual(result["M&M - Peanut"]["sales"], 2)
-            self.assertEqual(result["M&M - Regular"]["sales"], 3)
+            self.assertEqual(result["Sprite"]["sales"], 3)
+            self.assertEqual(result["Sunflower Seeds - Dill Pickle"]["sales"], 2)
         finally:
             os.unlink(path)
 
     def test_bloom_pop_flavor_modifier_uses_bloom_pop_dash_name(self):
         """Bloom Pop Flavor modifier set constructs 'Bloom Pop - {modifier}' names."""
         path = _write_tmp_csv([
-            {"Modifier Set": "Bloom Pop Flavor", "Modifier": "Strawberry Cream",
+            {"Modifier Set": "Bloom Pop", "Modifier": "Strawberry Cream",
              "Qty Sold": "2", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Bloom Pop Flavor", "Modifier": "Raspberry Lemonade",
+            {"Modifier Set": "Bloom Pop", "Modifier": "Raspberry Lemonade",
              "Qty Sold": "3", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Bloom Pop Flavor", "Modifier": "Watermelon Lime",
+            {"Modifier Set": "Bloom Pop", "Modifier": "Watermelon Lime",
              "Qty Sold": "1", "Gross Sales": "$0.00"},
         ])
         try:
@@ -416,14 +487,25 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_iced_coffee_modifier_uses_current_item_prefix(self):
+        path = _write_tmp_csv([
+            {"Modifier Set": "Iced Coffee", "Modifier": "Vanilla", "Qty Sold": "4", "Gross Sales": "$0.00"},
+        ])
+        try:
+            result = take_modifiers(path)
+            self.assertEqual(result["Iced Coffee - Vanilla"]["sales"], 4)
+            self.assertNotIn("La Colombe - Vanilla", result)
+        finally:
+            os.unlink(path)
+
     def test_poppi_flavor_modifier_uses_poppi_dash_name(self):
         """Poppi Flavor modifier set constructs 'Poppi - {modifier}' names."""
         path = _write_tmp_csv([
-            {"Modifier Set": "Poppi Flavor", "Modifier": "Watermelon",
+            {"Modifier Set": "Poppi", "Modifier": "Watermelon",
              "Qty Sold": "4", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Poppi Flavor", "Modifier": "Wild Berry",
+            {"Modifier Set": "Poppi", "Modifier": "Wild Berry",
              "Qty Sold": "2", "Gross Sales": "$0.00"},
-            {"Modifier Set": "Poppi Flavor", "Modifier": "Raspberry Rose",
+            {"Modifier Set": "Poppi", "Modifier": "Raspberry Rose",
              "Qty Sold": "5", "Gross Sales": "$0.00"},
         ])
         try:
@@ -455,6 +537,76 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
         )
         result = take_modifiers(missing_path)
         self.assertEqual(result, {})
+
+
+class CallSheetsAlignmentTests(unittest.TestCase):
+    """Verify Call_sheets item lists and stand restrictions match modifier outputs."""
+
+    def test_slushie_and_snack_rows_use_current_names(self):
+        self.assertEqual(
+            SLUSHIE_FLAVORS,
+            [
+                "Slushie - Mango",
+                "Slushie - Blue Razz",
+                "Slushie - Tiger's Blood",
+                "Slushie - Green Apple",
+                "Slushie - Peach",
+            ],
+        )
+        for snack in (
+            "Rainbow Sprinkles",
+            "Whipped Cream",
+            "Sunflower Seeds - Original",
+            "Sunflower Seeds - Dill Pickle",
+            "Sunflower Seeds - Ranch",
+            "Crunchy Ra-Ra - Sprinkles",
+        ):
+            self.assertIn(snack, SNACKS)
+        self.assertNotIn("Sprinkles", SNACKS)
+
+    def test_bottled_drinks_use_current_item_names(self):
+        for item in (
+            "Iced Coffee - Vanilla",
+            "Iced Coffee - Mocha",
+            "Iced Coffee - Caramel",
+            "Bloom Pop - Watermelon Lime",
+            "Poppi - Raspberry Rose",
+            "Diet Mt. Dew",
+            "7UP",
+        ):
+            self.assertIn(item, BOTTLED_DRINKS)
+        self.assertNotIn("La Colombe - Vanilla", BOTTLED_DRINKS)
+        self.assertNotIn("Gatorade - Orange", BOTTLED_DRINKS)
+
+    def test_location_specific_item_stands_match_requested_restrictions(self):
+        self.assertIn("Mt. Dew", FOUNTAIN_DRINKS)
+        self.assertIn("Ham & Cheese Sandwich", FOOD)
+        self.assertEqual(
+            LOCATION_SPECIFIC_ITEM_STANDS["Ham & Cheese Sandwich"],
+            {"BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC", "PTAC", "REED ROAD", "TREMONT"},
+        )
+        self.assertEqual(
+            LOCATION_SPECIFIC_ITEM_STANDS["Bloom Pop - Watermelon Lime"],
+            {"BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC", "REED ROAD", "TREMONT"},
+        )
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["Poppi - Wild Berry"], {"PTAC"})
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["M&M - Peanut"], {"HILLIARD2 (EAST)", "Bevelhymer Yellow"})
+        self.assertEqual(
+            LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Dr. Pepper")],
+            {"BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC", "PTAC", "REED ROAD", "TREMONT"},
+        )
+        self.assertEqual(
+            LOCATION_SPECIFIC_ITEM_STANDS[("BOTTLED_DRINKS", "Dr. Pepper")],
+            {"DEVON", "Bevelhymer Yellow"},
+        )
+        self.assertEqual(
+            LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Mt. Dew")],
+            {"PTAC"},
+        )
+        self.assertEqual(
+            LOCATION_SPECIFIC_ITEM_STANDS[("BOTTLED_DRINKS", "Mt. Dew")],
+            {"DEVON", "Bevelhymer Yellow"},
+        )
 
 
 if __name__ == "__main__":

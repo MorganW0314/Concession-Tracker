@@ -110,11 +110,13 @@ class InventoryRefactorTests(unittest.TestCase):
             {"TREMONT", "REED ROAD", "NWSC"},
         )
 
-    def test_bloom_pop_locations_use_canonical_bevelhymer_name(self):
+    def test_bloom_pop_locations_match_current_catalog(self):
         self.assertIn("Bloom Pop - Watermelon Lime", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
         stands = Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Bloom Pop - Watermelon Lime"]
-        self.assertIn("Bevelhymer Yellow", stands)
-        self.assertNotIn("Bevelhymer", stands)
+        self.assertEqual(
+            stands,
+            {"BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC", "REED ROAD", "TREMONT"},
+        )
 
     def test_poppi_raspberry_rose_name_and_restriction_are_canonical(self):
         self.assertIn("Poppi - Raspberry Rose", Call_sheets.BOTTLED_DRINKS)
@@ -163,7 +165,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertIn("Mint Chip", ptac["ICE_CREAM_TOFTS"])
         self.assertEqual(
             set(ptac["FOUNTAIN_DRINKS"]),
-            {"Dr. Pepper", "Root Beer", "Diet Pepsi", "Pepsi", "Starry"},
+            {"Dr. Pepper", "Root Beer", "Diet Pepsi", "Mt. Dew", "Pepsi", "Starry"},
         )
         self.assertNotIn("Coca Cola", ptac["FOUNTAIN_DRINKS"])
         self.assertNotIn("7up", ptac["FOUNTAIN_DRINKS"])
@@ -175,23 +177,26 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertIn("Mint Chip", treemont["ICE_CREAM_TOFTS"])
         self.assertIn("Coca Cola", treemont["FOUNTAIN_DRINKS"])
         self.assertTrue(
-            {"7up", "Big Red", "Diet RC", "Dr. Pepper", "Lemonade", "Root Beer", "RC Cola", "Coca Cola"}.issubset(
+            {"Big Red", "Dr. Pepper", "Lemonade", "Root Beer", "Coca Cola", "Diet Coke"}.issubset(
                 set(treemont["FOUNTAIN_DRINKS"])
             )
         )
+        self.assertNotIn("7up", treemont["FOUNTAIN_DRINKS"])
+        self.assertNotIn("Diet RC", treemont["FOUNTAIN_DRINKS"])
+        self.assertNotIn("RC Cola", treemont["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet Pepsi", treemont["FOUNTAIN_DRINKS"])
         self.assertNotIn("Pepsi", treemont["FOUNTAIN_DRINKS"])
         self.assertNotIn("Starry", treemont["FOUNTAIN_DRINKS"])
 
-    def test_fountain_drinks_list_excludes_mt_dew_and_includes_lemonade(self):
-        self.assertNotIn("Mt. Dew", Call_sheets.FOUNTAIN_DRINKS)
+    def test_fountain_drinks_list_includes_mt_dew_and_lemonade(self):
+        self.assertIn("Mt. Dew", Call_sheets.FOUNTAIN_DRINKS)
         self.assertIn("Lemonade", Call_sheets.FOUNTAIN_DRINKS)
 
     def test_lemonade_restricted_to_non_ptac_stands(self):
-        self.assertIn("Lemonade", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
-        self.assertNotIn("PTAC", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Lemonade"])
-        self.assertIn("TREMONT", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Lemonade"])
-        self.assertIn("Bevelhymer Green", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Lemonade"])
+        self.assertIn(("FOUNTAIN_DRINKS", "Lemonade"), Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
+        self.assertNotIn("PTAC", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Lemonade")])
+        self.assertIn("TREMONT", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Lemonade")])
+        self.assertNotIn("Bevelhymer Green", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Lemonade")])
 
     def test_read_deliveries_converts_fountain_packages_to_stand_oz(self):
         header = [["Date", "Item Name", "Packages", "Units per package"]]
@@ -248,8 +253,8 @@ class InventoryRefactorTests(unittest.TestCase):
             Call_sheets.SLUSHIE_FLAVORS,
             [
                 "Slushie - Mango",
-                "Slushie - Blue Raz",
-                "Slushie - Tigers Blood",
+                "Slushie - Blue Razz",
+                "Slushie - Tiger's Blood",
                 "Slushie - Green Apple",
                 "Slushie - Peach",
             ],
