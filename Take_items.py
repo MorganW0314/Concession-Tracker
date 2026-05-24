@@ -444,7 +444,7 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                     if modifier == "RC":
                         item_name = "RC Cola"
                     elif modifier == "Coke":
-                        item_name = "Coca Cola"
+                        item_name = "Coke"
                     else:
                         item_name = modifier
                 elif base_name == HAM_CHICKEN_MODIFIER_SET:

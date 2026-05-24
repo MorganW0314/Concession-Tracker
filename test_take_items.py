@@ -487,7 +487,7 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
             result = take_modifiers(path)
             self.assertEqual(result["Rainbow Sprinkles"]["sales"], 3)
             self.assertEqual(result["RC Cola"]["sales"], 4)
-            self.assertEqual(result["Coca Cola"]["sales"], 2)
+            self.assertEqual(result["Coke"]["sales"], 2)
             self.assertEqual(result["Ham & Cheese Sandwich"]["sales"], 5)
             self.assertEqual(result["Chicken Salad Sandwich"]["sales"], 1)
             self.assertEqual(result["Iced Coffee - Mocha"]["sales"], 5)
