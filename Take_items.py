@@ -12,6 +12,8 @@ COMBO_BREAKDOWN = {
     "Uncrustable COMBO": ["Uncrustable", "Assorted Chips"],
     "Chicken Salad Combo Meal": ["Chicken Salad Sandwich", "Assorted Chips"],
     "Combo Meal 3": ["Chicken Salad Sandwich", "Assorted Chips"],
+    # Sandwich quantity comes from the modifier-sales CSV via
+    # "Ham Sandwich OR Chicken Salad"; only the chips come from the combo row.
     "Chicken Salad OR Ham Sandwich COMBO": ["Assorted Chips"],
     "Ham and Cheese Combo Meal": ["Ham & Cheese Sandwich", "Assorted Chips"],
     "Hot Dog Combo Meal": ["Hot Dog", "Assorted Chips"],
@@ -26,8 +28,8 @@ COMBO_BREAKDOWN = {
 MODIFIER_ITEMS = {
     "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow"],
     "Ice Cream Toppings": [],
-    "Toppings": [],  # values come from modifier CSV (e.g., Sprinkles, Whipped Cream)
-    "Topping": [],  # variant modifier-set naming
+    "Toppings": [],  # legacy Square naming variant; values come from modifier CSV
+    "Topping": [],  # legacy Square naming variant; values come from modifier CSV
     "Fountain Drink Flavor": [],
     "Fountain Drink": [],  # flavors come from modifier CSV
     "Fountain": [],  # variant modifier-set naming
@@ -83,6 +85,7 @@ POPPI_FLAVOR_SET_PREFIX_LOWER = POPPI_FLAVOR_SET_PREFIX.lower()
 _TOFTS_ICE_CREAM_SKIP_ITEMS: frozenset = frozenset({
     # Base flavors
     "Brownie Bandit", "Birthday Cake", "Chocolate", "Cookie Dough",
+    # Keep both Cotton Candy names because Square/POS exports have used both.
     "Cookie Monster", "Cookies n' Cream", "Vanilla", "Cotton Candy", "Cotton Candy Ice Cream",
     "Mint Chip", "Rainbow Sherbet", "PB S'Mores", "Blueberry Waffle Cone",
     # Scoop variants
@@ -372,6 +375,8 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                 modifier_set_lower = modifier_set.lower()
                 if ICE_CREAM_FLAVOR_SET_PREFIX in modifier_set:
                     item_name = modifier
+                # Some stands export the slushie modifier set as the bare display
+                # name "Flavor"; treat it the same as the explicit "Slushie" set.
                 elif modifier_set == "Flavor" or SLUSHIE_FLAVOR_SET_PREFIX_LOWER in modifier_set_lower:
                     item_name = f"Slushie - {modifier}"
                 elif (

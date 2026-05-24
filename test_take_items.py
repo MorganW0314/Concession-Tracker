@@ -90,6 +90,7 @@ class ModifierItemsConstantTests(unittest.TestCase):
             MODIFIER_ITEMS["Gatorade"],
             ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow"],
         )
+        self.assertNotIn("Gatorade - Orange", MODIFIER_ITEMS["Gatorade"])
 
     def test_slushie_and_crunchy_items_in_modifier_items(self):
         self.assertIn("Slushie", MODIFIER_ITEMS)
