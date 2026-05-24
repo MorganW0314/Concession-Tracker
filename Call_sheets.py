@@ -1637,7 +1637,6 @@ SNACKS = [
     "Popcorn",
     "Peanuts Shelled",
     "Kars",
-    "Clif Bar",
     "Fig Bars",
     "Doughnut Packs",
 ]
@@ -1769,7 +1768,7 @@ PTAC_ONLY = {"PTAC"}
 HAM_SANDWICH_STANDS = NON_BEVELHYMER_STANDS
 MMS_STANDS = {"HILLIARD2 (EAST)", "Bevelhymer Yellow"}
 CHOCOLATE_BAR_STANDS = BEVELHYMER_STANDS
-SODA_CAN_STANDS = {"DEVON", "Bevelhymer Yellow"}
+SODA_CAN_STANDS = {"Bevelhymer Green", "Bevelhymer Yellow"}
 SUNFLOWER_SEED_STANDS = {"HILLIARD2 (EAST)", "Bevelhymer Yellow"}
 LOCATION_SPECIFIC_ITEM_STANDS = {
     ("FOUNTAIN_DRINKS", "7up"): UA_AND_NWSC_FOUNTAIN_STANDS,
@@ -1823,7 +1822,6 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     # Snacks — Bevelhymer only
     "Peanuts Shelled": BEVELHYMER_STANDS,
     "Kars": BEVELHYMER_STANDS,
-    "Clif Bar": BEVELHYMER_STANDS,
     "Fig Bars": BEVELHYMER_STANDS,
     "Doughnut Packs": BEVELHYMER_STANDS,
 }
