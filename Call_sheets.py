@@ -1744,6 +1744,7 @@ BEVELHYMER_STANDS = {"Bevelhymer Green", "Bevelhymer Yellow"}
 NON_BEVELHYMER_STANDS = ALL_STANDS - BEVELHYMER_STANDS
 UA_AND_NWSC_FOUNTAIN_STANDS = {"BEXLEY", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC"}
 UA_FOUNTAIN_STANDS = {"DEVON", "REED ROAD", "TREMONT"}
+RAINBOW_SHERBET_FLOAT_STANDS = {"HILLIARD1 (WEST)", "TREMONT", "PTAC", "NWSC"}
 BLOOM_POP_STANDS = {
     "BEXLEY",
     "DEVON",
@@ -1808,7 +1809,7 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     # Novelties — location-restricted items
     "Cannonball!!!": NON_BEVELHYMER_STANDS,
     "Root Beer Float": NON_BEVELHYMER_STANDS,
-    "Rainbow Sherbet Float": {"HILLIARD1 (WEST)", "TREMONT", "PTAC", "NWSC"},
+    "Rainbow Sherbet Float": RAINBOW_SHERBET_FLOAT_STANDS,
     # Snacks — Bevelhymer only
     "Peanuts Shelled": BEVELHYMER_STANDS,
     "Kars": BEVELHYMER_STANDS,

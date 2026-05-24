@@ -27,11 +27,13 @@ COMBO_BREAKDOWN = {
 
 # Floats: the float item itself is counted normally in inventory; these
 # components are ALSO deducted from their respective inventory totals.
+_DEFAULT_RAINBOW_SHERBET_SODA = "7up"
+
 FLOAT_BREAKDOWN = {
     "Root Beer Float": ["Root Beer", "Vanilla"],
     # Default soda component for Rainbow Sherbet Float is 7up; overridden at
     # PTAC via RAINBOW_SHERBET_FLOAT_SODA when stand_name is known.
-    "Rainbow Sherbet Float": ["Rainbow Sherbet", "7up"],
+    "Rainbow Sherbet Float": ["Rainbow Sherbet", _DEFAULT_RAINBOW_SHERBET_SODA],
 }
 
 # Stand-specific soda component for Rainbow Sherbet Float.
@@ -39,9 +41,9 @@ FLOAT_BREAKDOWN = {
 # use 7up (which is already the default in FLOAT_BREAKDOWN).
 RAINBOW_SHERBET_FLOAT_SODA = {
     "PTAC": "Starry",
-    "HILLIARD1 (WEST)": "7up",
-    "TREMONT": "7up",
-    "NWSC": "7up",
+    "HILLIARD1 (WEST)": _DEFAULT_RAINBOW_SHERBET_SODA,
+    "TREMONT": _DEFAULT_RAINBOW_SHERBET_SODA,
+    "NWSC": _DEFAULT_RAINBOW_SHERBET_SODA,
 }
 
 MODIFIER_ITEMS = {
@@ -265,7 +267,7 @@ def take_items(csv_file_path, stand_name=None):
                     soda_override = RAINBOW_SHERBET_FLOAT_SODA.get(stand_name)
                     if soda_override:
                         components = [
-                            soda_override if c == "7up" else c
+                            soda_override if c == _DEFAULT_RAINBOW_SHERBET_SODA else c
                             for c in components
                         ]
                 for comp in components:

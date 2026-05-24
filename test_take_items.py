@@ -41,6 +41,7 @@ from Call_sheets import (
     FOUNTAIN_DRINKS,
     LOCATION_SPECIFIC_ITEM_STANDS,
     NOVELTIES,
+    RAINBOW_SHERBET_FLOAT_STANDS,
     SLUSHIE_FLAVORS,
     SNACKS,
 )
@@ -709,7 +710,6 @@ class NewItemsInventoryTests(unittest.TestCase):
         "NWSC", "PTAC", "REED ROAD", "TREMONT",
     }
     BEVELHYMER = {"Bevelhymer Green", "Bevelhymer Yellow"}
-    RAINBOW_SHERBET_FLOAT_STANDS = {"HILLIARD1 (WEST)", "TREMONT", "PTAC", "NWSC"}
 
     def test_novelties_correct_square_names(self):
         for item in (
@@ -758,7 +758,7 @@ class NewItemsInventoryTests(unittest.TestCase):
         self.assertIn("Rainbow Sherbet Float", LOCATION_SPECIFIC_ITEM_STANDS)
         self.assertEqual(
             LOCATION_SPECIFIC_ITEM_STANDS["Rainbow Sherbet Float"],
-            self.RAINBOW_SHERBET_FLOAT_STANDS,
+            RAINBOW_SHERBET_FLOAT_STANDS,
         )
 
     def test_bevelhymer_snacks_restricted_correctly(self):
