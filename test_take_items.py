@@ -4,9 +4,11 @@ import tempfile
 import unittest
 
 from Take_items import (
+    BLOOM_POP_FLAVOR_SET_PREFIX,
     CRUNCHY_RARA_MODIFIER_PREFIX,
     ICE_CREAM_FLAVOR_SET_PREFIX,
     MODIFIER_ITEMS,
+    POPPI_FLAVOR_SET_PREFIX,
     SLUSHIE_FLAVOR_SET_PREFIX,
     _TOFTS_ICE_CREAM_SKIP_ITEMS,
     take_items,
@@ -62,6 +64,8 @@ class ModifierItemsConstantTests(unittest.TestCase):
             "Chocolate Bar",
             "Soda Can",
             "Sunflower Seeds",
+            "Bloom Pop",
+            "Poppi",
         ):
             self.assertIn(item, MODIFIER_ITEMS)
 
@@ -71,6 +75,8 @@ class ModifierItemsConstantTests(unittest.TestCase):
     def test_new_modifier_prefix_constants(self):
         self.assertEqual(SLUSHIE_FLAVOR_SET_PREFIX, "Slushie Flavor")
         self.assertEqual(CRUNCHY_RARA_MODIFIER_PREFIX, "Crunchy")
+        self.assertEqual(BLOOM_POP_FLAVOR_SET_PREFIX, "Bloom Pop")
+        self.assertEqual(POPPI_FLAVOR_SET_PREFIX, "Poppi")
 
     def test_tofts_skip_items_includes_base_flavors(self):
         for flavor in ("Cookie Monster", "Blueberry Waffle Cone", "Vanilla", "Chocolate",
@@ -216,7 +222,25 @@ class TakeItemsSkipTests(unittest.TestCase):
         finally:
             os.unlink(path)
 
-    def test_new_combo_meal_entries_are_expanded(self):
+    def test_bloom_pop_and_poppi_base_items_are_skipped(self):
+        """Base 'Bloom Pop' and 'Poppi' items must be skipped in take_items()."""
+        path = _write_tmp_csv([
+            {"Item Name": "Bloom Pop", "Item Variation": "Regular",
+             "Units Sold": "5", "Units Refunded": "0"},
+            {"Item Name": "Poppi", "Item Variation": "Regular",
+             "Units Sold": "3", "Units Refunded": "0"},
+            {"Item Name": "Hot Dog", "Item Variation": "Regular",
+             "Units Sold": "2", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertNotIn("Bloom Pop", result)
+            self.assertNotIn("Poppi", result)
+            self.assertEqual(result["Hot Dog"]["sales"], 2)
+        finally:
+            os.unlink(path)
+
+
         path = _write_tmp_csv([
             {"Item Name": "Combo Meal 3", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "1"},
             {"Item Name": "Ham and Cheese Combo Meal", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
@@ -368,6 +392,48 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
             self.assertEqual(result["Milky Way"]["sales"], 1)
             self.assertEqual(result["M&M - Peanut"]["sales"], 2)
             self.assertEqual(result["M&M - Regular"]["sales"], 3)
+        finally:
+            os.unlink(path)
+
+    def test_bloom_pop_flavor_modifier_uses_bloom_pop_dash_name(self):
+        """Bloom Pop Flavor modifier set constructs 'Bloom Pop - {modifier}' names."""
+        path = _write_tmp_csv([
+            {"Modifier Set": "Bloom Pop Flavor", "Modifier": "Strawberry Cream",
+             "Qty Sold": "2", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Bloom Pop Flavor", "Modifier": "Raspberry Lemonade",
+             "Qty Sold": "3", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Bloom Pop Flavor", "Modifier": "Watermelon Lime",
+             "Qty Sold": "1", "Gross Sales": "$0.00"},
+        ])
+        try:
+            result = take_modifiers(path)
+            self.assertEqual(result["Bloom Pop - Strawberry Cream"]["sales"], 2)
+            self.assertEqual(result["Bloom Pop - Raspberry Lemonade"]["sales"], 3)
+            self.assertEqual(result["Bloom Pop - Watermelon Lime"]["sales"], 1)
+            self.assertNotIn("Strawberry Cream", result)
+            self.assertNotIn("Raspberry Lemonade", result)
+            self.assertNotIn("Watermelon Lime", result)
+        finally:
+            os.unlink(path)
+
+    def test_poppi_flavor_modifier_uses_poppi_dash_name(self):
+        """Poppi Flavor modifier set constructs 'Poppi - {modifier}' names."""
+        path = _write_tmp_csv([
+            {"Modifier Set": "Poppi Flavor", "Modifier": "Watermelon",
+             "Qty Sold": "4", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Poppi Flavor", "Modifier": "Wild Berry",
+             "Qty Sold": "2", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Poppi Flavor", "Modifier": "Raspberry Rose",
+             "Qty Sold": "5", "Gross Sales": "$0.00"},
+        ])
+        try:
+            result = take_modifiers(path)
+            self.assertEqual(result["Poppi - Watermelon"]["sales"], 4)
+            self.assertEqual(result["Poppi - Wild Berry"]["sales"], 2)
+            self.assertEqual(result["Poppi - Raspberry Rose"]["sales"], 5)
+            self.assertNotIn("Watermelon", result)
+            self.assertNotIn("Wild Berry", result)
+            self.assertNotIn("Raspberry Rose", result)
         finally:
             os.unlink(path)
 
