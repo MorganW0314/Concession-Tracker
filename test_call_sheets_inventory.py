@@ -222,6 +222,11 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertNotIn("Pepsi", treemont["FOUNTAIN_DRINKS"])
         self.assertNotIn("Starry", treemont["FOUNTAIN_DRINKS"])
 
+        bevelhymer_green = dict(Call_sheets.get_default_category_order_for_stand("Bevelhymer Green"))
+        bevelhymer_yellow = dict(Call_sheets.get_default_category_order_for_stand("Bevelhymer Yellow"))
+        self.assertNotIn("ICE_CREAM_TOFTS", bevelhymer_green)
+        self.assertNotIn("ICE_CREAM_TOFTS", bevelhymer_yellow)
+
     def test_fountain_drinks_list_includes_mt_dew_and_lemonade(self):
         self.assertIn("Mt. Dew", Call_sheets.FOUNTAIN_DRINKS)
         self.assertIn("Lemonade", Call_sheets.FOUNTAIN_DRINKS)
@@ -652,6 +657,82 @@ class SyncStandItemListTests(unittest.TestCase):
         self.assertEqual(result["removed"], ["Obsolete Item"])
         self.assertTrue(any("deleteDimension" in request for request in batch_requests))
 
+    def test_removes_blank_col_a_row_with_week_data(self):
+        category_order = [("CAT_A", ["Apple"])]
+        full_grid = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["", "WeekData"]]
+        col_a = [[row[0] if row else ""] for row in full_grid]
+
+        sheet = MagicMock()
+
+        def get_side_effect(*args, **kwargs):
+            query_range = kwargs.get("range", "")
+            response = {"values": full_grid if query_range.endswith("!A:ZZ") else col_a}
+            mock = MagicMock()
+            mock.execute.return_value = response
+            return mock
+
+        sheet.values.return_value.get.side_effect = get_side_effect
+        service = _make_service()
+
+        batch_requests = []
+
+        def capture_batch(spreadsheetId, body):
+            batch_requests.extend(body.get("requests", []))
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand", return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(result["removed"], ["<blank>"])
+        self.assertTrue(any("deleteDimension" in request for request in batch_requests))
+
+    def test_removes_fully_empty_row(self):
+        category_order = [("CAT_A", ["Apple"])]
+        full_grid = [["ITEM"], [""], ["CAT_A"], ["Apple"], []]
+        col_a = [[row[0] if row else ""] for row in full_grid]
+
+        sheet = MagicMock()
+
+        def get_side_effect(*args, **kwargs):
+            query_range = kwargs.get("range", "")
+            response = {"values": full_grid if query_range.endswith("!A:ZZ") else col_a}
+            mock = MagicMock()
+            mock.execute.return_value = response
+            return mock
+
+        sheet.values.return_value.get.side_effect = get_side_effect
+        service = _make_service()
+
+        batch_requests = []
+
+        def capture_batch(spreadsheetId, body):
+            batch_requests.extend(body.get("requests", []))
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand", return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(result["removed"], ["<blank>"])
+        self.assertTrue(any("deleteDimension" in request for request in batch_requests))
+
     def test_deletion_expected_set_uses_canonical_defaults_not_master_augmented_order(self):
         col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["Obsolete Item"]]
         sheet = self._make_sheet(col_a)
@@ -766,6 +847,7 @@ class SyncStandItemListTests(unittest.TestCase):
             {"red": 1.0, "green": 1.0, "blue": 1.0},
         )
         self.assertIn("backgroundColorStyle", repeat_cell["fields"])
+        self.assertEqual(repeat_cell["range"]["endColumnIndex"], 200)
 
 
 if __name__ == "__main__":
