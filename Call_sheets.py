@@ -2705,23 +2705,26 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
         range=f"'{stand_name}'!A:ZZ",
     ).execute().get("values", [])
 
+    def _delete_row(row_num_1based):
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"requests": [{
+                "deleteDimension": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": row_num_1based - 1,
+                        "endIndex": row_num_1based,
+                    }
+                }
+            }]},
+        ).execute()
+
     # -- Deletions first (bottom-to-top) --
     for row_num in range(len(sheet_values), DATA_START_ROW - 1, -1):
         row_values = sheet_values[row_num - 1] if row_num - 1 < len(sheet_values) else []
         if not row_values:
-            service.spreadsheets().batchUpdate(
-                spreadsheetId=spreadsheet_id,
-                body={"requests": [{
-                    "deleteDimension": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "dimension": "ROWS",
-                            "startIndex": row_num - 1,
-                            "endIndex": row_num,
-                        }
-                    }
-                }]},
-            ).execute()
+            _delete_row(row_num)
             logging.getLogger(__name__).info(
                 "sync: removed blank/dead row %d from '%s'",
                 row_num,
@@ -2731,19 +2734,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
             continue
         item_name = str(row_values[0] if len(row_values) > 0 else "").strip()
         if not item_name:
-            service.spreadsheets().batchUpdate(
-                spreadsheetId=spreadsheet_id,
-                body={"requests": [{
-                    "deleteDimension": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "dimension": "ROWS",
-                            "startIndex": row_num - 1,
-                            "endIndex": row_num,
-                        }
-                    }
-                }]},
-            ).execute()
+            _delete_row(row_num)
             logging.getLogger(__name__).info(
                 "sync: removed blank/dead row %d from '%s'",
                 row_num,
