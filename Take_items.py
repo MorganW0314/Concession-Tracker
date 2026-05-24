@@ -9,6 +9,8 @@ COMBO_BREAKDOWN = {
     "Chili Cheese Dog Combo Meal": ["Chili Cheese Dog", "Assorted Chips"],
     "Uncrustable Combo Meal": ["Uncrustable", "Assorted Chips"],
     "Chicken Salad Combo Meal": ["Chicken Salad Sandwich", "Assorted Chips"],
+    "Combo Meal 3": ["Chicken Salad", "Assorted Chips"],
+    "Ham and Cheese Combo Meal": ["Ham and Cheese", "Assorted Chips"],
     "Hot Dog Combo Meal": ["Hot Dog", "Assorted Chips"],
     "Pizza Combo Meal": ["Pizza", "Assorted Chips"],
     "Whole Jet's Pizza": ["Pizza", "Pizza", "Pizza", "Pizza", "Pizza", "Pizza", "Pizza", "Pizza"],
@@ -17,6 +19,15 @@ COMBO_BREAKDOWN = {
 
 MODIFIER_ITEMS = {
     "Gatorade": ["Gatorade - Blue", "Gatorade - Red", "Gatorade - Yellow", "Gatorade - Orange"],
+    "Toppings": [],  # values come from modifier CSV (e.g., Sprinkles, Whipped Cream)
+    "Topping": [],  # variant modifier-set naming
+    "Fountain Drink": [],  # flavors come from modifier CSV
+    "Fountain": [],  # variant modifier-set naming
+    "Iced Coffee": [],  # flavor modifiers map to La Colombe inventory rows
+    "La Colombe": [],  # variant modifier-set naming
+    "Chocolate Bar": [],  # Bevelhymer-only flavor modifiers
+    "Soda Can": [],  # TODO: add soda can flavors when confirmed
+    "Sunflower Seeds": [],  # TODO: add sunflower seed flavors when confirmed
     "Slushie": [],      # slushie flavors come from modifier CSV
     "Crunchy Ra-Ra": [],  # crunchy flavors come from modifier CSV
     "Crunchy Rara": [],   # backward-compatible naming variant
@@ -345,6 +356,23 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                     item_name = f"Crunchy Ra-Ra - {modifier}"
                 elif base_name == "Gatorade":
                     item_name = f"Gatorade - {modifier}"
+                elif "topping" in modifier_set_lower:
+                    item_name = modifier
+                elif base_name in {"Fountain Drink", "Fountain"}:
+                    item_name = modifier
+                elif base_name in {"Iced Coffee", "La Colombe"}:
+                    item_name = f"La Colombe - {modifier}"
+                elif base_name == "Chocolate Bar":
+                    modifier_lower = modifier.lower()
+                    if modifier_lower.startswith("m&m"):
+                        if "peanut" in modifier_lower:
+                            item_name = "M&M - Peanut"
+                        elif "regular" in modifier_lower or "plain" in modifier_lower:
+                            item_name = "M&M - Regular"
+                        else:
+                            item_name = "M&M"
+                    else:
+                        item_name = modifier
                 else:
                     item_name = f"{base_name} {modifier}"
 

@@ -1510,6 +1510,11 @@ CANDY = [
     "Nerds Clusters",
     "Cotton Candy",
     "Cowtails",
+    "Milky Way",
+    "Twix",
+    "Snickers",
+    "M&M - Peanut",
+    "M&M - Regular",
 ]
 
 FOUNTAIN_DRINKS = [
@@ -1543,6 +1548,7 @@ BOTTLED_DRINKS = [
     "La Colombe - Vanilla",
     "La Colombe - Mocha",
     "La Colombe - Caramel",
+    "Soda Can",  # TODO: placeholder item until soda can flavors are confirmed
 ]
 
 
@@ -1558,6 +1564,7 @@ SLUSHIE_FLAVORS = [
 FOOD = [
     "Pizza",
     "Chicken Salad",
+    "Ham and Cheese",
     "Hot Dog",
     "Chili Sauce (cans)",
     "Pulled Pork (bags)",
@@ -1583,6 +1590,9 @@ SNACKS = [
     "Crunchy Ra-Ra - Mango",
     "Crunchy Ra-Ra - Sprinkles",
     "Crunchy Ra-Ra - Strawberry",
+    "Sprinkles",
+    "Whipped Cream",
+    "Sunflower Seeds",  # TODO: placeholder item until sunflower seed flavors are confirmed
     "String Cheese",
     "Frozen Grapes",
     "Pickles",
@@ -1715,6 +1725,13 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Poppi - Wild Berry": {"PTAC"},
     "Poppi - Raspberry Rose": {"PTAC"},
     "Popcorn": {"TREMONT", "REED ROAD", "NWSC"},
+    "Milky Way": {"Bevelhymer Green", "Bevelhymer Yellow"},
+    "Twix": {"Bevelhymer Green", "Bevelhymer Yellow"},
+    "Snickers": {"Bevelhymer Green", "Bevelhymer Yellow"},
+    "M&M - Peanut": {"Bevelhymer Green", "Bevelhymer Yellow"},
+    "M&M - Regular": {"Bevelhymer Green", "Bevelhymer Yellow"},
+    "Soda Can": {"Bevelhymer Green", "Bevelhymer Yellow"},
+    "Sunflower Seeds": {"Bevelhymer Green", "Bevelhymer Yellow"},
     "Bloom Pop - Strawberry Cream":    {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
     "Bloom Pop - Raspberry Lemonade":  {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
     "Bloom Pop - Watermelon Lime":     {"Bevelhymer Green", "Bevelhymer Yellow", "BEXLEY", "HILLIARD1 (WEST)", "HILLIARD2 (EAST)", "REED ROAD", "TREMONT", "DEVON"},
