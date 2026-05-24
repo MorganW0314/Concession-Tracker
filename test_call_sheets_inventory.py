@@ -572,11 +572,9 @@ class SyncStandItemListTests(unittest.TestCase):
         self.assertIn("added", result)
         self.assertIn("skipped", result)
         self.assertIn("removed", result)
-        self.assertIn("skipped_deletion", result)
         self.assertIsInstance(result["added"], list)
         self.assertIsInstance(result["skipped"], list)
         self.assertIsInstance(result["removed"], list)
-        self.assertIsInstance(result["skipped_deletion"], list)
 
     def test_removes_obsolete_rows_without_week_data(self):
         category_order = [("CAT_A", ["Apple"])]
@@ -614,10 +612,9 @@ class SyncStandItemListTests(unittest.TestCase):
             )
 
         self.assertEqual(result["removed"], ["Obsolete Item"])
-        self.assertEqual(result["skipped_deletion"], [])
         self.assertTrue(any("deleteDimension" in request for request in batch_requests))
 
-    def test_skips_obsolete_row_deletion_when_week_data_exists(self):
+    def test_removes_obsolete_row_even_when_week_data_exists(self):
         category_order = [("CAT_A", ["Apple"])]
         full_grid = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["Obsolete Item", "WeekData"]]
         col_a = [[row[0]] for row in full_grid]
@@ -652,9 +649,8 @@ class SyncStandItemListTests(unittest.TestCase):
                 sheet, service, self.SPREADSHEET_ID, self.STAND
             )
 
-        self.assertEqual(result["removed"], [])
-        self.assertEqual(result["skipped_deletion"], ["Obsolete Item"])
-        self.assertFalse(any("deleteDimension" in request for request in batch_requests))
+        self.assertEqual(result["removed"], ["Obsolete Item"])
+        self.assertTrue(any("deleteDimension" in request for request in batch_requests))
 
     def test_deletion_expected_set_uses_canonical_defaults_not_master_augmented_order(self):
         col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["Obsolete Item"]]
