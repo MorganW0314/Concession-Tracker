@@ -2669,7 +2669,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     -----
     * Only Column A is modified — week-data columns (B onward) are untouched.
     * Rows 1 and 2 are never deleted.
-    * Obsolete rows are deleted unconditionally.
+    * Obsolete rows are deleted unconditionally, including rows with week data.
     * The operation is idempotent: running it twice adds 0 items the second time.
     * New category headers get the same light-blue bold formatting as existing ones.
     * New item rows get plain white formatting.
