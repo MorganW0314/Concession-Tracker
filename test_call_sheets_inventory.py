@@ -729,6 +729,7 @@ class SyncStandItemListTests(unittest.TestCase):
                 sheet, service, self.SPREADSHEET_ID, self.STAND
             )
 
+        # Rows are deleted bottom-to-top to avoid index shifting during deletions.
         self.assertEqual(delete_start_indexes, [3, 2])
         self.assertNotIn(1, delete_start_indexes)
 
