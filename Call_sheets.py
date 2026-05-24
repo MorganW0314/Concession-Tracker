@@ -2709,9 +2709,47 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     for row_num in range(len(sheet_values), DATA_START_ROW - 1, -1):
         row_values = sheet_values[row_num - 1] if row_num - 1 < len(sheet_values) else []
         if not row_values:
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body={"requests": [{
+                    "deleteDimension": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "dimension": "ROWS",
+                            "startIndex": row_num - 1,
+                            "endIndex": row_num,
+                        }
+                    }
+                }]},
+            ).execute()
+            logging.getLogger(__name__).info(
+                "sync: removed blank/dead row %d from '%s'",
+                row_num,
+                stand_name,
+            )
+            removed.append("<blank>")
             continue
         item_name = str(row_values[0] if len(row_values) > 0 else "").strip()
         if not item_name:
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body={"requests": [{
+                    "deleteDimension": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "dimension": "ROWS",
+                            "startIndex": row_num - 1,
+                            "endIndex": row_num,
+                        }
+                    }
+                }]},
+            ).execute()
+            logging.getLogger(__name__).info(
+                "sync: removed blank/dead row %d from '%s'",
+                row_num,
+                stand_name,
+            )
+            removed.append("<blank>")
             continue
         normalized_item = normalize_item_name(item_name)
         if not normalized_item or normalized_item in expected_names_normalized:
@@ -2831,6 +2869,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
                 "backgroundColor": {"red": 0.647, "green": 0.761, "blue": 0.902},
                 "textFormat": {"bold": True},
             }
+            end_column_index = 1
         else:
             cell_format = {
                 "backgroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0},
@@ -2839,6 +2878,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
                 },
                 "textFormat": {"bold": False},
             }
+            end_column_index = 200
 
         service.spreadsheets().batchUpdate(
             spreadsheetId=spreadsheet_id,
@@ -2849,7 +2889,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
                         "startRowIndex": new_row_1based - 1,
                         "endRowIndex": new_row_1based,
                         "startColumnIndex": 0,
-                        "endColumnIndex": 1,
+                        "endColumnIndex": end_column_index,
                     },
                     "cell": {"userEnteredFormat": cell_format},
                     "fields": "userEnteredFormat(backgroundColor,backgroundColorStyle,textFormat)",
