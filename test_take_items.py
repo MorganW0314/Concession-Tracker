@@ -53,6 +53,18 @@ class ModifierItemsConstantTests(unittest.TestCase):
         self.assertIn("Crunchy Rara", MODIFIER_ITEMS)
         self.assertIn("Crunchy Ra-Ra Yogurt", MODIFIER_ITEMS)
 
+    def test_new_modifier_items_added(self):
+        for item in (
+            "Toppings",
+            "Fountain Drink",
+            "Iced Coffee",
+            "La Colombe",
+            "Chocolate Bar",
+            "Soda Can",
+            "Sunflower Seeds",
+        ):
+            self.assertIn(item, MODIFIER_ITEMS)
+
     def test_ice_cream_flavor_prefix_constant(self):
         self.assertEqual(ICE_CREAM_FLAVOR_SET_PREFIX, "Ice Cream Flavor")
 
@@ -182,6 +194,43 @@ class TakeItemsSkipTests(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_new_modifier_base_items_are_skipped(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Toppings", "Item Variation": "Regular", "Units Sold": "4", "Units Refunded": "0"},
+            {"Item Name": "Fountain Drink", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "0"},
+            {"Item Name": "Iced Coffee", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
+            {"Item Name": "Chocolate Bar", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
+            {"Item Name": "Soda Can", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
+            {"Item Name": "Sunflower Seeds", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
+            {"Item Name": "Hot Dog", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertNotIn("Toppings", result)
+            self.assertNotIn("Fountain Drink", result)
+            self.assertNotIn("Iced Coffee", result)
+            self.assertNotIn("Chocolate Bar", result)
+            self.assertNotIn("Soda Can", result)
+            self.assertNotIn("Sunflower Seeds", result)
+            self.assertEqual(result["Hot Dog"]["sales"], 2)
+        finally:
+            os.unlink(path)
+
+    def test_new_combo_meal_entries_are_expanded(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Combo Meal 3", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "1"},
+            {"Item Name": "Ham and Cheese Combo Meal", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertEqual(result["Chicken Salad"]["sales"], 2)
+            self.assertEqual(result["Ham and Cheese"]["sales"], 2)
+            self.assertEqual(result["Assorted Chips"]["sales"], 4)
+            self.assertNotIn("Combo Meal 3", result)
+            self.assertNotIn("Ham and Cheese Combo Meal", result)
+        finally:
+            os.unlink(path)
+
 
 class TakeModifiersIceCreamTests(unittest.TestCase):
     """Verify take_modifiers() correctly parses ice cream flavor modifier CSVs."""
@@ -297,6 +346,28 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
         try:
             result = take_modifiers(path)
             self.assertEqual(result["Crunchy Ra-Ra - Strawberry"]["sales"], 3)
+        finally:
+            os.unlink(path)
+
+    def test_new_modifier_set_name_construction(self):
+        path = _write_tmp_csv([
+            {"Modifier Set": "Toppings", "Modifier": "Sprinkles", "Qty Sold": "3", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Topping Options", "Modifier": "Whipped Cream", "Qty Sold": "2", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Fountain Drink Flavor", "Modifier": "Dr. Pepper", "Qty Sold": "4", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Iced Coffee Flavor", "Modifier": "Mocha", "Qty Sold": "5", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Chocolate Bar", "Modifier": "Milky Way", "Qty Sold": "1", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Chocolate Bar", "Modifier": "M&M Peanut", "Qty Sold": "2", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Chocolate Bar", "Modifier": "M&M Regular", "Qty Sold": "3", "Gross Sales": "$0.00"},
+        ])
+        try:
+            result = take_modifiers(path)
+            self.assertEqual(result["Sprinkles"]["sales"], 3)
+            self.assertEqual(result["Whipped Cream"]["sales"], 2)
+            self.assertEqual(result["Dr. Pepper"]["sales"], 4)
+            self.assertEqual(result["La Colombe - Mocha"]["sales"], 5)
+            self.assertEqual(result["Milky Way"]["sales"], 1)
+            self.assertEqual(result["M&M - Peanut"]["sales"], 2)
+            self.assertEqual(result["M&M - Regular"]["sales"], 3)
         finally:
             os.unlink(path)
 
