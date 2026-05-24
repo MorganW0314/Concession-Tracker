@@ -222,6 +222,11 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertNotIn("Pepsi", treemont["FOUNTAIN_DRINKS"])
         self.assertNotIn("Starry", treemont["FOUNTAIN_DRINKS"])
 
+        bevelhymer_green = dict(Call_sheets.get_default_category_order_for_stand("Bevelhymer Green"))
+        bevelhymer_yellow = dict(Call_sheets.get_default_category_order_for_stand("Bevelhymer Yellow"))
+        self.assertNotIn("ICE_CREAM_TOFTS", bevelhymer_green)
+        self.assertNotIn("ICE_CREAM_TOFTS", bevelhymer_yellow)
+
     def test_fountain_drinks_list_includes_mt_dew_and_lemonade(self):
         self.assertIn("Mt. Dew", Call_sheets.FOUNTAIN_DRINKS)
         self.assertIn("Lemonade", Call_sheets.FOUNTAIN_DRINKS)
