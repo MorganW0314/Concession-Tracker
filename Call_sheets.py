@@ -2720,7 +2720,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
             }]},
         ).execute()
 
-    def remove_blank_row(row_num_1based):
+    def remove_dead_row(row_num_1based):
         delete_row(row_num_1based)
         logging.getLogger(__name__).info(
             "sync: removed blank/dead row %d from '%s'",
@@ -2733,29 +2733,17 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     for row_num in range(len(sheet_values), DATA_START_ROW - 1, -1):
         row_values = sheet_values[row_num - 1] if row_num - 1 < len(sheet_values) else []
         if not row_values:
-            remove_blank_row(row_num)
+            remove_dead_row(row_num)
             continue
         item_name = str(row_values[0] if len(row_values) > 0 else "").strip()
         if not item_name:
-            remove_blank_row(row_num)
+            remove_dead_row(row_num)
             continue
         normalized_item = normalize_item_name(item_name)
         if not normalized_item or normalized_item in expected_names_normalized:
             continue
 
-        service.spreadsheets().batchUpdate(
-            spreadsheetId=spreadsheet_id,
-            body={"requests": [{
-                "deleteDimension": {
-                    "range": {
-                        "sheetId": sheet_id,
-                        "dimension": "ROWS",
-                        "startIndex": row_num - 1,
-                        "endIndex": row_num,
-                    }
-                }
-            }]},
-        ).execute()
+        delete_row(row_num)
         logging.getLogger(__name__).info(
             "sync: removed obsolete row %d ('%s') from '%s'",
             row_num,
