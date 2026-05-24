@@ -427,6 +427,8 @@ UNIT_CONVERSION = {
 
     # Airheads (non-ice cream)
     "Airheads 2 for $1": 2,
+    # Cuties — sold 2 for $1; each transaction counts as 2 units
+    "Cuties (2/$1.00)": 2,
 }
 def normalize_flavor(item):
     """Normalize only the flavor portion of an ice cream scoop item."""
@@ -1487,17 +1489,20 @@ TOFTS_ICE_CREAM = [
 
 NOVELTIES = [
     "Bomb Pop",
+    "Cannonball!!!",
     "Cookie Sandwich",
-    "Nerds Bomb Pop",
-    "PowderPuff Girl",
-    "Reese's Sandwiches",
-    "Snickers",
-    "Sonic",
-    "Spiderman",
-    "Spongebob",
-    "Strawberry Shortcake",
+    "Nerd Bomb Pop",
+    "Power Puff Girl",
+    "Rainbow Sherbet Float",
+    "Reese's Ice Cream",
+    "Root Beer Float",
+    "Snickers Ice Cream Bar",
+    "Sonic The Hedgehog",
+    "Spiderman Ice Cream",
+    "Spongebob Ice Cream",
+    "Strawberry Shortcake Bar",
     "Sundae Cone",
-    "Twix",
+    "Twix Ice Cream Bar",
 ]
 
 CANDY = [
@@ -1575,11 +1580,13 @@ SLUSHIE_FLAVORS = [
 
 FOOD = [
     "Pizza Slice",
+    "Chicken Caesar Salad",
     "Chicken Salad Sandwich",
     "Ham & Cheese Sandwich",
     "Hot Dog",
     "Chili Cheese Dog",
     "Pulled Pork Sandwich",
+    "Hummus and Pita Chips",
     "Chili Sauce (cans)",
     "Pulled Pork (bags)",
     "Uncrustable",
@@ -1613,9 +1620,15 @@ SNACKS = [
     "Frozen Grapes",
     "Pickles",
     "Go-Go Squeez",
+    "Cuties (2/$1.00)",
     "Oranges",
     "Granola Bar",
     "Popcorn",
+    "Peanuts Shelled",
+    "Kars",
+    "Clif Bar",
+    "Fig Bars",
+    "Doughnut Packs",
 ]
 
 DISPOSABLES = [
@@ -1731,6 +1744,7 @@ BEVELHYMER_STANDS = {"Bevelhymer Green", "Bevelhymer Yellow"}
 NON_BEVELHYMER_STANDS = ALL_STANDS - BEVELHYMER_STANDS
 UA_AND_NWSC_FOUNTAIN_STANDS = {"BEXLEY", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC"}
 UA_FOUNTAIN_STANDS = {"DEVON", "REED ROAD", "TREMONT"}
+RAINBOW_SHERBET_FLOAT_STANDS = {"HILLIARD1 (WEST)", "TREMONT", "PTAC", "NWSC"}
 BLOOM_POP_STANDS = {
     "BEXLEY",
     "DEVON",
@@ -1792,6 +1806,16 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Sunflower Seeds - Original": SUNFLOWER_SEED_STANDS,
     "Sunflower Seeds - Dill Pickle": SUNFLOWER_SEED_STANDS,
     "Sunflower Seeds - Ranch": SUNFLOWER_SEED_STANDS,
+    # Novelties — location-restricted items
+    "Cannonball!!!": NON_BEVELHYMER_STANDS,
+    "Root Beer Float": NON_BEVELHYMER_STANDS,
+    "Rainbow Sherbet Float": RAINBOW_SHERBET_FLOAT_STANDS,
+    # Snacks — Bevelhymer only
+    "Peanuts Shelled": BEVELHYMER_STANDS,
+    "Kars": BEVELHYMER_STANDS,
+    "Clif Bar": BEVELHYMER_STANDS,
+    "Fig Bars": BEVELHYMER_STANDS,
+    "Doughnut Packs": BEVELHYMER_STANDS,
 }
 
 
