@@ -2669,8 +2669,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     -----
     * Only Column A is modified — week-data columns (B onward) are untouched.
     * Rows 1 and 2 are never deleted.
-    * Obsolete rows are deleted only when they have no week data in columns B+.
-      Rows with historical week data are skipped and logged as warnings.
+    * Obsolete rows are deleted unconditionally, including rows with week data.
     * The operation is idempotent: running it twice adds 0 items the second time.
     * New category headers get the same light-blue bold formatting as existing ones.
     * New item rows get plain white formatting.
@@ -2681,8 +2680,6 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
         "added"            – list of item/header names that were inserted
         "skipped"          – list of item names that already existed in Column A
         "removed"          – list of obsolete row names that were deleted
-        "skipped_deletion" – list of obsolete row names not deleted due to
-                             historical week data in columns B+
     """
     # -- Build expected category order (same logic as write_full_week) --
     category_order = _build_category_order_for_stand(sheet, spreadsheet_id, stand_name)
@@ -2705,7 +2702,6 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
                 expected_names_normalized.add(normalized_item)
 
     removed = []
-    skipped_deletion = []
     sheet_values = sheet.values().get(
         spreadsheetId=spreadsheet_id,
         range=f"'{stand_name}'!A:ZZ",
@@ -2721,16 +2717,6 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
             continue
         normalized_item = normalize_item_name(item_name)
         if not normalized_item or normalized_item in expected_names_normalized:
-            continue
-
-        has_week_data = any(str(cell).strip() != "" for cell in row_values[1:])
-        if has_week_data:
-            logging.getLogger(__name__).warning(
-                "sync: skipping deletion of '%s' in '%s' — row has historical data in week columns",
-                item_name,
-                stand_name,
-            )
-            skipped_deletion.append(item_name)
             continue
 
         service.spreadsheets().batchUpdate(
@@ -2802,7 +2788,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
 
     if not insertions:
         _sync_master_items_tab(sheet, service, spreadsheet_id, stand_name)
-        return {"added": [], "skipped": skipped, "removed": removed, "skipped_deletion": skipped_deletion}
+        return {"added": [], "skipped": skipped, "removed": removed}
 
     # -- Sort insertions bottom-to-top so earlier inserts don't shift later ones --
     # Primary sort: anchor_row descending (process lowest row last).
@@ -2874,7 +2860,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
         ).execute()
 
     _sync_master_items_tab(sheet, service, spreadsheet_id, stand_name)
-    return {"added": added, "skipped": skipped, "removed": removed, "skipped_deletion": skipped_deletion}
+    return {"added": added, "skipped": skipped, "removed": removed}
 
 
 def connect_to_sheets():
