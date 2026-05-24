@@ -241,6 +241,11 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertIn("TREMONT", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Lemonade")])
         self.assertNotIn("Bevelhymer Green", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Lemonade")])
 
+    def test_coke_fallback_restriction_applies_without_category(self):
+        self.assertFalse(Call_sheets._is_item_available_at_stand("Coke", "PTAC"))
+        self.assertTrue(Call_sheets._is_item_available_at_stand("Coke", "TREMONT"))
+        self.assertTrue(Call_sheets._is_item_available_at_stand("Coke", "Bevelhymer Green"))
+
     def test_read_deliveries_converts_fountain_packages_to_stand_oz(self):
         header = [["Date", "Item Name", "Packages", "Units per package"]]
         rows = [["05-10-2026", "Diet RC", "2", "1"]]
