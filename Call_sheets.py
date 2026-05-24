@@ -1838,6 +1838,9 @@ def _is_item_available_at_stand(item_name, stand_name, category_name=None):
     if not stand_name:
         return True
 
+    if category_name == "ICE_CREAM_TOFTS" and stand_name in BEVELHYMER_STANDS:
+        return False
+
     if item_name in PREMIUM_ICE_CREAM_ITEMS:
         return stand_name in PREMIUM_ICE_CREAM_STANDS
 
