@@ -189,7 +189,7 @@ class InventoryRefactorTests(unittest.TestCase):
     def test_get_default_category_order_for_stand_filters_location_items(self):
         bexley = dict(Call_sheets.get_default_category_order_for_stand("BEXLEY"))
         self.assertNotIn("Mint Chip", bexley["ICE_CREAM_TOFTS"])
-        self.assertNotIn("Coca Cola", bexley["FOUNTAIN_DRINKS"])
+        self.assertNotIn("Coke", bexley["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet Pepsi", bexley["FOUNTAIN_DRINKS"])
         self.assertIn("7up", bexley["FOUNTAIN_DRINKS"])
         self.assertIn("Diet RC", bexley["FOUNTAIN_DRINKS"])
@@ -201,7 +201,7 @@ class InventoryRefactorTests(unittest.TestCase):
             set(ptac["FOUNTAIN_DRINKS"]),
             {"Dr. Pepper", "Root Beer", "Diet Pepsi", "Mt. Dew", "Pepsi", "Starry"},
         )
-        self.assertNotIn("Coca Cola", ptac["FOUNTAIN_DRINKS"])
+        self.assertNotIn("Coke", ptac["FOUNTAIN_DRINKS"])
         self.assertNotIn("7up", ptac["FOUNTAIN_DRINKS"])
         self.assertNotIn("Big Red", ptac["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet RC", ptac["FOUNTAIN_DRINKS"])
@@ -209,9 +209,9 @@ class InventoryRefactorTests(unittest.TestCase):
 
         treemont = dict(Call_sheets.get_default_category_order_for_stand("TREMONT"))
         self.assertIn("Mint Chip", treemont["ICE_CREAM_TOFTS"])
-        self.assertIn("Coca Cola", treemont["FOUNTAIN_DRINKS"])
+        self.assertIn("Coke", treemont["FOUNTAIN_DRINKS"])
         self.assertTrue(
-            {"Big Red", "Dr. Pepper", "Lemonade", "Root Beer", "Coca Cola", "Diet Coke"}.issubset(
+            {"Big Red", "Dr. Pepper", "Lemonade", "Root Beer", "Coke", "Diet Coke"}.issubset(
                 set(treemont["FOUNTAIN_DRINKS"])
             )
         )
@@ -236,6 +236,11 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertNotIn("PTAC", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Lemonade")])
         self.assertIn("TREMONT", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Lemonade")])
         self.assertNotIn("Bevelhymer Green", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Lemonade")])
+
+    def test_coke_fallback_restriction_applies_without_category(self):
+        self.assertFalse(Call_sheets._is_item_available_at_stand("Coke", "PTAC"))
+        self.assertTrue(Call_sheets._is_item_available_at_stand("Coke", "TREMONT"))
+        self.assertTrue(Call_sheets._is_item_available_at_stand("Coke", "Bevelhymer Green"))
 
     def test_read_deliveries_converts_fountain_packages_to_stand_oz(self):
         header = [["Date", "Item Name", "Packages", "Units per package"]]

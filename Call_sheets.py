@@ -1812,6 +1812,7 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     ("BOTTLED_DRINKS", "7UP"): SODA_CAN_STANDS,
     ("BOTTLED_DRINKS", "Sunkist - Orange"): SODA_CAN_STANDS,
     ("BOTTLED_DRINKS", "AW Root Beer"): SODA_CAN_STANDS,
+    "Coke": UA_FOUNTAIN_STANDS | SODA_CAN_STANDS,
     "Sunflower Seeds - Original": SUNFLOWER_SEED_STANDS,
     "Sunflower Seeds - Dill Pickle": SUNFLOWER_SEED_STANDS,
     "Sunflower Seeds - Ranch": SUNFLOWER_SEED_STANDS,
