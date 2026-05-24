@@ -98,7 +98,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertNotIn("Hummus and Pita Chips", Call_sheets.FOOD)
         self.assertNotIn("Pulled Pork Sandwich", Call_sheets.FOOD)
         self.assertNotIn("Salad", Call_sheets.FOOD)
-        self.assertIn("Chili Cheese Dog", Call_sheets.FOOD)
+        self.assertNotIn("Chili Cheese Dog", Call_sheets.FOOD)
         self.assertIn("Ham", Call_sheets.FOOD)
         self.assertIn("Cheese", Call_sheets.FOOD)
         self.assertNotIn("Ham & Cheese Sandwich", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
@@ -191,7 +191,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertNotIn("Mint Chip", bexley["ICE_CREAM_TOFTS"])
         self.assertNotIn("Coke", bexley["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet Pepsi", bexley["FOUNTAIN_DRINKS"])
-        self.assertNotIn("7up", bexley["FOUNTAIN_DRINKS"])
+        self.assertIn("7up", bexley["FOUNTAIN_DRINKS"])
         self.assertIn("Diet RC", bexley["FOUNTAIN_DRINKS"])
         self.assertNotIn("RC Cola", bexley["FOUNTAIN_DRINKS"])
         self.assertIn("Big Red", bexley["FOUNTAIN_DRINKS"])
@@ -230,6 +230,16 @@ class InventoryRefactorTests(unittest.TestCase):
         bevelhymer_yellow = dict(Call_sheets.get_default_category_order_for_stand("Bevelhymer Yellow"))
         self.assertNotIn("ICE_CREAM_TOFTS", bevelhymer_green)
         self.assertNotIn("ICE_CREAM_TOFTS", bevelhymer_yellow)
+
+    def test_sunflower_seeds_are_bevelhymer_only(self):
+        self.assertEqual(
+            Call_sheets.SUNFLOWER_SEED_STANDS,
+            Call_sheets.BEVELHYMER_STANDS,
+        )
+        hilliard_east = dict(Call_sheets.get_default_category_order_for_stand("HILLIARD2 (EAST)"))
+        bevelhymer_green = dict(Call_sheets.get_default_category_order_for_stand("Bevelhymer Green"))
+        self.assertNotIn("Sunflower Seeds - Original", hilliard_east["SNACKS"])
+        self.assertIn("Sunflower Seeds - Original", bevelhymer_green["SNACKS"])
 
     def test_fountain_drinks_list_includes_mt_dew_and_lemonade(self):
         self.assertIn("Mt. Dew", Call_sheets.FOUNTAIN_DRINKS)

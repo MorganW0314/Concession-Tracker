@@ -1601,7 +1601,6 @@ FOOD = [
     "Pizza Slice",
     "Chicken Caesar Salad",
     "Hot Dog",
-    "Chili Cheese Dog",
     "Chili Sauce (cans)",
     "Pulled Pork (bags)",
     "Uncrustable",
@@ -1772,9 +1771,9 @@ HAM_SANDWICH_STANDS = NON_BEVELHYMER_STANDS
 MMS_STANDS = {"HILLIARD2 (EAST)", "Bevelhymer Yellow", "Bevelhymer Green"}
 CHOCOLATE_BAR_STANDS = BEVELHYMER_STANDS
 SODA_CAN_STANDS = {"Bevelhymer Green", "Bevelhymer Yellow"}
-SUNFLOWER_SEED_STANDS = {"HILLIARD2 (EAST)", "Bevelhymer Yellow"}
+SUNFLOWER_SEED_STANDS = BEVELHYMER_STANDS
 LOCATION_SPECIFIC_ITEM_STANDS = {
-    ("FOUNTAIN_DRINKS", "7up"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "7up"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS | {"BEXLEY"},
     ("FOUNTAIN_DRINKS", "Big Red"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS | {"BEXLEY"},
     ("FOUNTAIN_DRINKS", "Diet RC"): UA_AND_NWSC_FOUNTAIN_STANDS | {"BEXLEY"},
     ("FOUNTAIN_DRINKS", "Dr. Pepper"): NON_BEVELHYMER_STANDS,
