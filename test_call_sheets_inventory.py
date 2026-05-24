@@ -92,6 +92,17 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertNotIn("Hot Dogs", Call_sheets.FOOD)
         self.assertNotIn("Hot Dogs", Call_sheets.INGREDIENTS)
 
+    def test_food_list_excludes_menu_items_tracked_via_ingredients(self):
+        self.assertNotIn("Chicken Salad Sandwich", Call_sheets.FOOD)
+        self.assertNotIn("Ham & Cheese Sandwich", Call_sheets.FOOD)
+        self.assertNotIn("Hummus and Pita Chips", Call_sheets.FOOD)
+        self.assertNotIn("Pulled Pork Sandwich", Call_sheets.FOOD)
+        self.assertNotIn("Salad", Call_sheets.FOOD)
+        self.assertIn("Chili Cheese Dog", Call_sheets.FOOD)
+        self.assertIn("Ham", Call_sheets.FOOD)
+        self.assertIn("Cheese", Call_sheets.FOOD)
+        self.assertNotIn("Ham & Cheese Sandwich", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
+
     def test_calculate_ingredients_per_stand_converts_to_cans_and_bags(self):
         rows = {
             "Walking Taco": {"sales": 15},
@@ -102,6 +113,16 @@ class InventoryRefactorTests(unittest.TestCase):
 
         self.assertEqual(result["Chili Sauce (cans)"]["sales"], 1.0)
         self.assertEqual(result["Pulled Pork (bags)"]["sales"], 1.0)
+
+    def test_ham_and_cheese_package_conversion_constants(self):
+        self.assertEqual(Call_sheets.HAM_SLICES_PER_PACKAGE, 32)
+        self.assertEqual(Call_sheets.CHEESE_SLICES_PER_PACKAGE, 160)
+
+    def test_calculate_ingredients_per_stand_converts_ham_and_cheese_to_packages(self):
+        rows = {"Ham and Cheese Sandwich": {"sales": 32}}
+        result = Call_sheets.calculate_ingredients_per_stand(rows)
+        self.assertEqual(result["Ham"]["sales"], 1.0)
+        self.assertEqual(result["Cheese"]["sales"], 0.2)
 
     def test_popcorn_location_restrictions(self):
         self.assertIn("Popcorn", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
@@ -520,7 +541,7 @@ class SyncStandItemListTests(unittest.TestCase):
     # Test: return value has correct structure                             #
     # ------------------------------------------------------------------ #
     def test_return_value_structure(self):
-        """sync_stand_item_list always returns a dict with added/skipped keys."""
+        """sync_stand_item_list always returns all expected bookkeeping keys."""
         category_order = [("CAT_A", ["Apple"])]
         col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"]]
         sheet = self._make_sheet(col_a)
@@ -537,8 +558,90 @@ class SyncStandItemListTests(unittest.TestCase):
 
         self.assertIn("added", result)
         self.assertIn("skipped", result)
+        self.assertIn("removed", result)
+        self.assertIn("skipped_deletion", result)
         self.assertIsInstance(result["added"], list)
         self.assertIsInstance(result["skipped"], list)
+        self.assertIsInstance(result["removed"], list)
+        self.assertIsInstance(result["skipped_deletion"], list)
+
+    def test_removes_obsolete_rows_without_week_data(self):
+        category_order = [("CAT_A", ["Apple"])]
+        full_grid = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["Obsolete Item"]]
+        col_a = [[row[0]] for row in full_grid]
+
+        sheet = MagicMock()
+
+        def get_side_effect(*args, **kwargs):
+            query_range = kwargs.get("range", "")
+            response = {"values": full_grid if query_range.endswith("!A:ZZ") else col_a}
+            mock = MagicMock()
+            mock.execute.return_value = response
+            return mock
+
+        sheet.values.return_value.get.side_effect = get_side_effect
+        service = _make_service()
+
+        batch_requests = []
+
+        def capture_batch(spreadsheetId, body):
+            batch_requests.extend(body.get("requests", []))
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand", return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(result["removed"], ["Obsolete Item"])
+        self.assertEqual(result["skipped_deletion"], [])
+        self.assertTrue(any("deleteDimension" in request for request in batch_requests))
+
+    def test_skips_obsolete_row_deletion_when_week_data_exists(self):
+        category_order = [("CAT_A", ["Apple"])]
+        full_grid = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["Obsolete Item", "WeekData"]]
+        col_a = [[row[0]] for row in full_grid]
+
+        sheet = MagicMock()
+
+        def get_side_effect(*args, **kwargs):
+            query_range = kwargs.get("range", "")
+            response = {"values": full_grid if query_range.endswith("!A:ZZ") else col_a}
+            mock = MagicMock()
+            mock.execute.return_value = response
+            return mock
+
+        sheet.values.return_value.get.side_effect = get_side_effect
+        service = _make_service()
+
+        batch_requests = []
+
+        def capture_batch(spreadsheetId, body):
+            batch_requests.extend(body.get("requests", []))
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with (
+            patch.object(Call_sheets, "read_master_items", return_value=None),
+            patch.object(Call_sheets, "get_default_category_order_for_stand", return_value=category_order),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(result["removed"], [])
+        self.assertEqual(result["skipped_deletion"], ["Obsolete Item"])
+        self.assertFalse(any("deleteDimension" in request for request in batch_requests))
 
     def test_new_item_format_explicitly_sets_white_background_style(self):
         category_order = [("CAT_A", ["Apple", "Banana"])]
