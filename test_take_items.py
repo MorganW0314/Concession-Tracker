@@ -37,6 +37,7 @@ _install_google_stubs()
 
 from Call_sheets import (
     BOTTLED_DRINKS,
+    CANDY,
     FOOD,
     FOUNTAIN_DRINKS,
     LOCATION_SPECIFIC_ITEM_STANDS,
@@ -618,14 +619,24 @@ class CallSheetsAlignmentTests(unittest.TestCase):
             {"BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC", "REED ROAD", "TREMONT"},
         )
         self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["Poppi - Wild Berry"], {"PTAC"})
-        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["M&M - Peanut"], {"HILLIARD2 (EAST)", "Bevelhymer Yellow"})
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["M&M - Peanut"], {"HILLIARD2 (EAST)", "Bevelhymer Yellow", "Bevelhymer Green"})
+        # New candy items
+        self.assertIn("Swedish Fish", CANDY)
+        self.assertNotIn("Swedish Fish", LOCATION_SPECIFIC_ITEM_STANDS)
+        self.assertIn("Big League Chew", CANDY)
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["Big League Chew"], {"Bevelhymer Green", "Bevelhymer Yellow"})
+        self.assertIn("Skittles", CANDY)
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["Skittles"], {"Bevelhymer Green", "Bevelhymer Yellow"})
+        # Peach Tea restricted to Bevelhymer
+        self.assertIn("Peach Tea", BOTTLED_DRINKS)
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["Peach Tea"], {"Bevelhymer Green", "Bevelhymer Yellow"})
         self.assertEqual(
             LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Dr. Pepper")],
             {"BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC", "PTAC", "REED ROAD", "TREMONT"},
         )
         self.assertEqual(
             LOCATION_SPECIFIC_ITEM_STANDS[("BOTTLED_DRINKS", "Dr. Pepper")],
-            {"DEVON", "Bevelhymer Yellow"},
+            {"Bevelhymer Green", "Bevelhymer Yellow"},
         )
         self.assertEqual(
             LOCATION_SPECIFIC_ITEM_STANDS[("FOUNTAIN_DRINKS", "Mt. Dew")],
@@ -633,7 +644,7 @@ class CallSheetsAlignmentTests(unittest.TestCase):
         )
         self.assertEqual(
             LOCATION_SPECIFIC_ITEM_STANDS[("BOTTLED_DRINKS", "Mt. Dew")],
-            {"DEVON", "Bevelhymer Yellow"},
+            {"Bevelhymer Green", "Bevelhymer Yellow"},
         )
 
 
