@@ -136,6 +136,32 @@ class ModifierItemsConstantTests(unittest.TestCase):
         self.assertEqual(ICE_CREAM_TOPPINGS_PREFIX, "Ice Cream Toppings")
         self.assertEqual(HAM_CHICKEN_MODIFIER_SET, "Ham Sandwich OR Chicken Salad")
 
+    def test_combo_breakdown_required_entries_exist(self):
+        self.assertEqual(
+            COMBO_BREAKDOWN["Chili Cheese Dog COMBO"],
+            ["Chili Cheese Dog", "Assorted Chips"],
+        )
+        self.assertEqual(
+            COMBO_BREAKDOWN["Chili Cheese Dog Combo Meal"],
+            ["Chili Cheese Dog", "Assorted Chips"],
+        )
+        self.assertEqual(
+            COMBO_BREAKDOWN["Pulled Pork COMBO"],
+            ["Pulled Pork Sandwich", "Assorted Chips"],
+        )
+        self.assertEqual(
+            COMBO_BREAKDOWN["Chicken Salad OR Ham Sandwich COMBO"],
+            ["Assorted Chips"],
+        )
+        self.assertEqual(
+            COMBO_BREAKDOWN["Hot Dog COMBO"],
+            ["Hot Dog", "Assorted Chips"],
+        )
+        self.assertEqual(
+            COMBO_BREAKDOWN["Pizza COMBO"],
+            ["Pizza Slice", "Assorted Chips"],
+        )
+
     def test_tofts_skip_items_includes_base_flavors(self):
         for flavor in ("Cookie Monster", "Blueberry Waffle Cone", "Vanilla", "Chocolate",
                        "Cookie Dough", "Brownie Bandit", "Birthday Cake", "Mint Chip",
@@ -585,11 +611,8 @@ class CallSheetsAlignmentTests(unittest.TestCase):
 
     def test_location_specific_item_stands_match_requested_restrictions(self):
         self.assertIn("Mt. Dew", FOUNTAIN_DRINKS)
-        self.assertIn("Ham & Cheese Sandwich", FOOD)
-        self.assertEqual(
-            LOCATION_SPECIFIC_ITEM_STANDS["Ham & Cheese Sandwich"],
-            {"BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC", "PTAC", "REED ROAD", "TREMONT"},
-        )
+        self.assertNotIn("Ham & Cheese Sandwich", FOOD)
+        self.assertNotIn("Ham & Cheese Sandwich", LOCATION_SPECIFIC_ITEM_STANDS)
         self.assertEqual(
             LOCATION_SPECIFIC_ITEM_STANDS["Bloom Pop - Watermelon Lime"],
             {"BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC", "REED ROAD", "TREMONT"},
@@ -733,7 +756,7 @@ class NewItemsInventoryTests(unittest.TestCase):
 
     def test_food_has_new_items(self):
         self.assertIn("Chicken Caesar Salad", FOOD)
-        self.assertIn("Hummus and Pita Chips", FOOD)
+        self.assertNotIn("Hummus and Pita Chips", FOOD)
 
     def test_snacks_has_new_items(self):
         for item in (

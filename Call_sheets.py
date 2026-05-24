@@ -57,6 +57,14 @@ CHICKEN_SALAD_OZ_PER_TUB = 48
 CHICKEN_SALAD_OZ_PER_SCOOP = 4
 CHICKEN_SALAD_SCOOPS_PER_TUB = CHICKEN_SALAD_OZ_PER_TUB // CHICKEN_SALAD_OZ_PER_SCOOP  # = 12
 
+# Ham conversion constants.
+# Delivered in ~32oz packages with approximately 32 slices per package.
+HAM_SLICES_PER_PACKAGE = 32
+
+# Cheese conversion constants.
+# Delivered in packages of 160 slices.
+CHEESE_SLICES_PER_PACKAGE = 160
+
 # Fountain syrup conversion constants.
 # 1 "package" on Deliveries-{stand} is converted to ounces automatically:
 #   PTAC uses 640oz bags; all other known stands in this map use 320oz bags.
@@ -910,6 +918,14 @@ def calculate_ingredients_per_stand(rows, ingredient_map=None):
         scoops_used = rows["Chicken Salad"].get("sales", 0)
         if scoops_used > 0:
             rows["Chicken Salad"]["sales"] = round(scoops_used / CHICKEN_SALAD_SCOOPS_PER_TUB, 2)
+    if "Ham" in rows:
+        slices_used = rows["Ham"].get("sales", 0)
+        if slices_used > 0:
+            rows["Ham"]["sales"] = round(slices_used / HAM_SLICES_PER_PACKAGE, 2)
+    if "Cheese" in rows:
+        slices_used = rows["Cheese"].get("sales", 0)
+        if slices_used > 0:
+            rows["Cheese"]["sales"] = round(slices_used / CHEESE_SLICES_PER_PACKAGE, 2)
 
     return rows
 
@@ -1581,12 +1597,8 @@ SLUSHIE_FLAVORS = [
 FOOD = [
     "Pizza Slice",
     "Chicken Caesar Salad",
-    "Chicken Salad Sandwich",
-    "Ham & Cheese Sandwich",
     "Hot Dog",
     "Chili Cheese Dog",
-    "Pulled Pork Sandwich",
-    "Hummus and Pita Chips",
     "Chili Sauce (cans)",
     "Pulled Pork (bags)",
     "Uncrustable",
@@ -1595,7 +1607,6 @@ FOOD = [
     "Hamburger Buns",
     "Hot Dog Buns",
     "Soft Pretzel",
-    "Salad",
     "Ham",
     "Cheese",
 ]
@@ -1789,7 +1800,6 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Iced Coffee - Vanilla": BLOOM_POP_STANDS,
     "Iced Coffee - Mocha": BLOOM_POP_STANDS,
     "Iced Coffee - Caramel": BLOOM_POP_STANDS,
-    "Ham & Cheese Sandwich": HAM_SANDWICH_STANDS,
     ("BOTTLED_DRINKS", "Diet Mt. Dew"): SODA_CAN_STANDS,
     ("BOTTLED_DRINKS", "Mt. Dew"): SODA_CAN_STANDS,
     ("BOTTLED_DRINKS", "Squirt"): SODA_CAN_STANDS,
@@ -2614,13 +2624,15 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     """Sync the expected item list into Column A of an existing stand sheet.
 
     Reads the current Column A, compares it against the expected category/item
-    order, and inserts any missing items or category headers in the correct
-    alphabetically-sorted position within their category.
+    order, removes obsolete rows, and inserts any missing items or category
+    headers in the correct alphabetically-sorted position within their category.
 
     Rules
     -----
     * Only Column A is modified — week-data columns (B onward) are untouched.
-    * Existing rows are never deleted, moved, or reformatted.
+    * Rows 1 and 2 are never deleted.
+    * Obsolete rows are deleted only when they have no week data in columns B+.
+      Rows with historical week data are skipped and logged as warnings.
     * The operation is idempotent: running it twice adds 0 items the second time.
     * New category headers get the same light-blue bold formatting as existing ones.
     * New item rows get plain white formatting.
@@ -2628,17 +2640,81 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     Returns
     -------
     dict with keys:
-        "added"   – list of item/header names that were inserted
-        "skipped" – list of item names that already existed in Column A
+        "added"            – list of item/header names that were inserted
+        "skipped"          – list of item names that already existed in Column A
+        "removed"          – list of obsolete row names that were deleted
+        "skipped_deletion" – list of obsolete row names not deleted due to
+                             historical week data in columns B+
     """
     # -- Build expected category order (same logic as write_full_week) --
     category_order = _build_category_order_for_stand(sheet, spreadsheet_id, stand_name)
 
-    # -- Read current Column A --
-    existing_map = read_item_row_map(sheet, spreadsheet_id, stand_name)
-
     # -- Get integer sheet ID for batchUpdate calls --
     sheet_id = get_sheet_id(service, spreadsheet_id, stand_name)
+
+    # -- Build normalized expected names set (category headers + items) --
+    expected_names_normalized = set()
+    for category_name, item_list in category_order:
+        normalized_category = normalize_item_name(category_name)
+        if normalized_category:
+            expected_names_normalized.add(normalized_category)
+        for item in item_list:
+            normalized_item = normalize_item_name(item)
+            if normalized_item:
+                expected_names_normalized.add(normalized_item)
+
+    removed = []
+    skipped_deletion = []
+    sheet_values = sheet.values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{stand_name}'!A:ZZ",
+    ).execute().get("values", [])
+
+    # -- Deletions first (bottom-to-top) --
+    for row_num in range(len(sheet_values), DATA_START_ROW - 1, -1):
+        row_values = sheet_values[row_num - 1] if row_num - 1 < len(sheet_values) else []
+        if not row_values:
+            continue
+        item_name = str(row_values[0] if len(row_values) > 0 else "").strip()
+        if not item_name:
+            continue
+        normalized_item = normalize_item_name(item_name)
+        if not normalized_item or normalized_item in expected_names_normalized:
+            continue
+
+        has_week_data = any(str(cell).strip() != "" for cell in row_values[1:])
+        if has_week_data:
+            logging.getLogger(__name__).warning(
+                "sync: skipping deletion of '%s' in '%s' — row has historical data in week columns",
+                item_name,
+                stand_name,
+            )
+            skipped_deletion.append(item_name)
+            continue
+
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"requests": [{
+                "deleteDimension": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": row_num - 1,
+                        "endIndex": row_num,
+                    }
+                }
+            }]},
+        ).execute()
+        logging.getLogger(__name__).info(
+            "sync: removed obsolete row %d ('%s') from '%s'",
+            row_num,
+            item_name,
+            stand_name,
+        )
+        removed.append(item_name)
+
+    # -- Read current Column A after deletions --
+    existing_map = read_item_row_map(sheet, spreadsheet_id, stand_name)
 
     # -- Build the list of rows that need to be inserted --
     # Each entry: (anchor_row_1based, sort_key_tuple, item_name, is_header)
@@ -2684,7 +2760,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
                 # they naturally accumulate in the correct sorted order.
 
     if not insertions:
-        return {"added": [], "skipped": skipped}
+        return {"added": [], "skipped": skipped, "removed": removed, "skipped_deletion": skipped_deletion}
 
     # -- Sort insertions bottom-to-top so earlier inserts don't shift later ones --
     # Primary sort: anchor_row descending (process lowest row last).
@@ -2755,7 +2831,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
             }]},
         ).execute()
 
-    return {"added": added, "skipped": skipped}
+    return {"added": added, "skipped": skipped, "removed": removed, "skipped_deletion": skipped_deletion}
 
 
 def connect_to_sheets():
