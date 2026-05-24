@@ -1522,20 +1522,22 @@ NOVELTIES = [
 ]
 
 CANDY = [
-    "Airheads",
-    "Sourpatch Kids",
+    "Airheads 2 for $1",
+    "Sour Patch Kids",
     "Ring Pop",
     "Slime Lickers",
     "Xtremes",
     "Starburst",
-    "Nerds Clusters",
+    "Nerd's Clusters",
     "Cotton Candy",
-    "Cowtails",
+    "Cow Tail",
     "Milky Way",
-    "Twix",
     "Snickers",
     "M&M - Peanut",
     "M&M - Regular",
+    "Swedish Fish",
+    "Big League Chew",
+    "Skittles",
 ]
 
 FOUNTAIN_DRINKS = [
@@ -1565,7 +1567,8 @@ BOTTLED_DRINKS = [
     "Poppi - Watermelon",
     "Poppi - Wild Berry",
     "Poppi - Raspberry Rose",
-    "Fairlife Protein",
+    "Fairlife",
+    "Peach Tea",
     "Iced Coffee - Vanilla",
     "Iced Coffee - Mocha",
     "Iced Coffee - Caramel",
@@ -1766,16 +1769,16 @@ BLOOM_POP_STANDS = {
 }
 PTAC_ONLY = {"PTAC"}
 HAM_SANDWICH_STANDS = NON_BEVELHYMER_STANDS
-MMS_STANDS = {"HILLIARD2 (EAST)", "Bevelhymer Yellow"}
+MMS_STANDS = {"HILLIARD2 (EAST)", "Bevelhymer Yellow", "Bevelhymer Green"}
 CHOCOLATE_BAR_STANDS = BEVELHYMER_STANDS
 SODA_CAN_STANDS = {"Bevelhymer Green", "Bevelhymer Yellow"}
 SUNFLOWER_SEED_STANDS = {"HILLIARD2 (EAST)", "Bevelhymer Yellow"}
 LOCATION_SPECIFIC_ITEM_STANDS = {
     ("FOUNTAIN_DRINKS", "7up"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS,
-    ("FOUNTAIN_DRINKS", "Big Red"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS,
-    ("FOUNTAIN_DRINKS", "Diet RC"): UA_AND_NWSC_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "Big Red"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS | {"BEXLEY"},
+    ("FOUNTAIN_DRINKS", "Diet RC"): UA_AND_NWSC_FOUNTAIN_STANDS | {"BEXLEY"},
     ("FOUNTAIN_DRINKS", "Dr. Pepper"): NON_BEVELHYMER_STANDS,
-    ("FOUNTAIN_DRINKS", "Lemonade"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS,
+    ("FOUNTAIN_DRINKS", "Lemonade"): UA_AND_NWSC_FOUNTAIN_STANDS | UA_FOUNTAIN_STANDS | {"BEXLEY"},
     ("FOUNTAIN_DRINKS", "Root Beer"): NON_BEVELHYMER_STANDS,
     ("FOUNTAIN_DRINKS", "RC Cola"): UA_AND_NWSC_FOUNTAIN_STANDS,
     ("FOUNTAIN_DRINKS", "Coke"): UA_FOUNTAIN_STANDS,
@@ -1789,8 +1792,9 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Poppi - Raspberry Rose": PTAC_ONLY,
     "Popcorn": {"TREMONT", "REED ROAD", "NWSC"},
     "Milky Way": CHOCOLATE_BAR_STANDS,
-    "Twix": CHOCOLATE_BAR_STANDS,
     "Snickers": CHOCOLATE_BAR_STANDS,
+    "Big League Chew": BEVELHYMER_STANDS,
+    "Skittles": BEVELHYMER_STANDS,
     "M&M - Peanut": MMS_STANDS,
     "M&M - Regular": MMS_STANDS,
     "Bloom Pop - Strawberry Cream": BLOOM_POP_STANDS,
@@ -1824,6 +1828,9 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Kars": BEVELHYMER_STANDS,
     "Fig Bars": BEVELHYMER_STANDS,
     "Doughnut Packs": BEVELHYMER_STANDS,
+    # Bottled drinks — Bevelhymer restrictions
+    "Fairlife": NON_BEVELHYMER_STANDS,
+    "Peach Tea": BEVELHYMER_STANDS,
 }
 
 

@@ -189,11 +189,15 @@ class InventoryRefactorTests(unittest.TestCase):
     def test_get_default_category_order_for_stand_filters_location_items(self):
         bexley = dict(Call_sheets.get_default_category_order_for_stand("BEXLEY"))
         self.assertNotIn("Mint Chip", bexley["ICE_CREAM_TOFTS"])
-        self.assertNotIn("Coca Cola", bexley["FOUNTAIN_DRINKS"])
+        self.assertNotIn("Coke", bexley["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet Pepsi", bexley["FOUNTAIN_DRINKS"])
-        self.assertIn("7up", bexley["FOUNTAIN_DRINKS"])
+        self.assertNotIn("7up", bexley["FOUNTAIN_DRINKS"])
         self.assertIn("Diet RC", bexley["FOUNTAIN_DRINKS"])
-        self.assertIn("RC Cola", bexley["FOUNTAIN_DRINKS"])
+        self.assertNotIn("RC Cola", bexley["FOUNTAIN_DRINKS"])
+        self.assertIn("Big Red", bexley["FOUNTAIN_DRINKS"])
+        self.assertIn("Lemonade", bexley["FOUNTAIN_DRINKS"])
+        self.assertIn("Root Beer", bexley["FOUNTAIN_DRINKS"])
+        self.assertIn("Dr. Pepper", bexley["FOUNTAIN_DRINKS"])
 
         ptac = dict(Call_sheets.get_default_category_order_for_stand("PTAC"))
         self.assertIn("Mint Chip", ptac["ICE_CREAM_TOFTS"])
@@ -201,7 +205,7 @@ class InventoryRefactorTests(unittest.TestCase):
             set(ptac["FOUNTAIN_DRINKS"]),
             {"Dr. Pepper", "Root Beer", "Diet Pepsi", "Mt. Dew", "Pepsi", "Starry"},
         )
-        self.assertNotIn("Coca Cola", ptac["FOUNTAIN_DRINKS"])
+        self.assertNotIn("Coke", ptac["FOUNTAIN_DRINKS"])
         self.assertNotIn("7up", ptac["FOUNTAIN_DRINKS"])
         self.assertNotIn("Big Red", ptac["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet RC", ptac["FOUNTAIN_DRINKS"])
@@ -209,13 +213,13 @@ class InventoryRefactorTests(unittest.TestCase):
 
         treemont = dict(Call_sheets.get_default_category_order_for_stand("TREMONT"))
         self.assertIn("Mint Chip", treemont["ICE_CREAM_TOFTS"])
-        self.assertIn("Coca Cola", treemont["FOUNTAIN_DRINKS"])
+        self.assertIn("Coke", treemont["FOUNTAIN_DRINKS"])
         self.assertTrue(
-            {"Big Red", "Dr. Pepper", "Lemonade", "Root Beer", "Coca Cola", "Diet Coke"}.issubset(
+            {"Big Red", "Dr. Pepper", "Lemonade", "Root Beer", "Coke", "Diet Coke"}.issubset(
                 set(treemont["FOUNTAIN_DRINKS"])
             )
         )
-        self.assertNotIn("7up", treemont["FOUNTAIN_DRINKS"])
+        self.assertIn("7up", treemont["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet RC", treemont["FOUNTAIN_DRINKS"])
         self.assertNotIn("RC Cola", treemont["FOUNTAIN_DRINKS"])
         self.assertNotIn("Diet Pepsi", treemont["FOUNTAIN_DRINKS"])
