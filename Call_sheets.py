@@ -2723,24 +2723,12 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
             }]},
         ).execute()
 
-    def remove_dead_row(row_num_1based):
-        delete_row(row_num_1based)
-        logging.getLogger(__name__).info(
-            "sync: removed blank/dead row %d from '%s'",
-            row_num_1based,
-            stand_name,
-        )
-        removed.append("<blank>")
-
     # -- Deletions first (bottom-to-top) --
     for row_num in range(len(sheet_values), DATA_START_ROW - 1, -1):
         row_values = sheet_values[row_num - 1] if row_num - 1 < len(sheet_values) else []
-        if not row_values:
-            remove_dead_row(row_num)
-            continue
         item_name = str(row_values[0] if len(row_values) > 0 else "").strip()
         if not item_name:
-            remove_dead_row(row_num)
+            # Blank Column A — may be intentional spacing; leave it alone.
             continue
         normalized_item = normalize_item_name(item_name)
         if not normalized_item or normalized_item in expected_names_normalized:
