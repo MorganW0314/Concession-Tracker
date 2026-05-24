@@ -2620,6 +2620,44 @@ def write_modifier_sales_to_week(sheet, service, spreadsheet_id, stand_name, mod
 
 
 
+def _sync_master_items_tab(sheet, service, spreadsheet_id, stand_name):
+    """Remove stale non-canonical items from the per-stand Master Items tab."""
+    tab_name = f"Master Items-{stand_name}"
+    try:
+        rows = get_values(sheet, spreadsheet_id, f"'{tab_name}'!A2:B500")
+        tab_sheet_id = get_sheet_id(service, spreadsheet_id, tab_name)
+    except Exception:
+        return
+
+    canonical_items_normalized = set()
+    for _category_name, item_list in get_default_category_order_for_stand(stand_name):
+        for item in item_list:
+            normalized_item = normalize_item_name(item)
+            if normalized_item:
+                canonical_items_normalized.add(normalized_item)
+
+    for row_num in range(len(rows) + 1, 1, -1):
+        row = rows[row_num - 2] if row_num - 2 < len(rows) else []
+        item_name = str(row[1] if len(row) > 1 else "").strip()
+        normalized_item = normalize_item_name(item_name)
+        if not normalized_item or normalized_item in canonical_items_normalized:
+            continue
+
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"requests": [{
+                "deleteDimension": {
+                    "range": {
+                        "sheetId": tab_sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": row_num - 1,
+                        "endIndex": row_num,
+                    }
+                }
+            }]},
+        ).execute()
+
+
 def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     """Sync the expected item list into Column A of an existing stand sheet.
 
@@ -2652,9 +2690,12 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
     # -- Get integer sheet ID for batchUpdate calls --
     sheet_id = get_sheet_id(service, spreadsheet_id, stand_name)
 
-    # -- Build normalized expected names set (category headers + items) --
+    # -- Build normalized expected names set from the CANONICAL code-defined list only. --
+    # Do NOT use _build_category_order_for_stand here — that reads the Master Items
+    # tab which may be stale and still contain old removed items.
     expected_names_normalized = set()
-    for category_name, item_list in category_order:
+    canonical_order = get_default_category_order_for_stand(stand_name)
+    for category_name, item_list in canonical_order:
         normalized_category = normalize_item_name(category_name)
         if normalized_category:
             expected_names_normalized.add(normalized_category)
@@ -2760,6 +2801,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
                 # they naturally accumulate in the correct sorted order.
 
     if not insertions:
+        _sync_master_items_tab(sheet, service, spreadsheet_id, stand_name)
         return {"added": [], "skipped": skipped, "removed": removed, "skipped_deletion": skipped_deletion}
 
     # -- Sort insertions bottom-to-top so earlier inserts don't shift later ones --
@@ -2831,6 +2873,7 @@ def sync_stand_item_list(sheet, service, spreadsheet_id, stand_name):
             }]},
         ).execute()
 
+    _sync_master_items_tab(sheet, service, spreadsheet_id, stand_name)
     return {"added": added, "skipped": skipped, "removed": removed, "skipped_deletion": skipped_deletion}
 
 

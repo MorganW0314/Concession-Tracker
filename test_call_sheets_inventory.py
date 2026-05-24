@@ -103,6 +103,19 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertIn("Cheese", Call_sheets.FOOD)
         self.assertNotIn("Ham & Cheese Sandwich", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
 
+    def test_removed_legacy_food_items_not_in_default_category_order_for_any_stand(self):
+        removed_items = {
+            "Chicken Salad Sandwich",
+            "Ham & Cheese Sandwich",
+            "Hummus and Pita Chips",
+            "Pulled Pork Sandwich",
+        }
+        for stand_name in Call_sheets.ALL_STANDS:
+            category_order = Call_sheets.get_default_category_order_for_stand(stand_name)
+            all_items = {item for _category, items in category_order for item in items}
+            for removed_item in removed_items:
+                self.assertNotIn(removed_item, all_items, msg=f"{removed_item} still present for {stand_name}")
+
     def test_calculate_ingredients_per_stand_converts_to_cans_and_bags(self):
         rows = {
             "Walking Taco": {"sales": 15},
@@ -642,6 +655,85 @@ class SyncStandItemListTests(unittest.TestCase):
         self.assertEqual(result["removed"], [])
         self.assertEqual(result["skipped_deletion"], ["Obsolete Item"])
         self.assertFalse(any("deleteDimension" in request for request in batch_requests))
+
+    def test_deletion_expected_set_uses_canonical_defaults_not_master_augmented_order(self):
+        col_a = [["ITEM"], [""], ["CAT_A"], ["Apple"], ["Obsolete Item"]]
+        sheet = self._make_sheet(col_a)
+        service = _make_service()
+
+        batch_requests = []
+
+        def capture_batch(spreadsheetId, body):
+            batch_requests.extend(body.get("requests", []))
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with (
+            patch.object(
+                Call_sheets,
+                "_build_category_order_for_stand",
+                return_value=[("CAT_A", ["Apple", "Obsolete Item"])],
+            ),
+            patch.object(
+                Call_sheets,
+                "get_default_category_order_for_stand",
+                return_value=[("CAT_A", ["Apple"])],
+            ),
+            patch.object(Call_sheets, "_sync_master_items_tab"),
+        ):
+            result = Call_sheets.sync_stand_item_list(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        self.assertEqual(result["removed"], ["Obsolete Item"])
+        self.assertTrue(any("deleteDimension" in request for request in batch_requests))
+
+    def test_sync_master_items_tab_removes_rows_not_in_canonical_defaults(self):
+        sheet = MagicMock()
+        sheet.values.return_value.get.return_value.execute.return_value = {
+            "values": [
+                ["CAT_A", "Apple"],
+                ["CAT_A", "Obsolete Item"],
+                ["CAT_A", "Legacy Item"],
+            ]
+        }
+
+        service = MagicMock()
+        service.spreadsheets.return_value.get.return_value.execute.return_value = {
+            "sheets": [
+                {"properties": {"title": "Test Stand", "sheetId": 42}},
+                {"properties": {"title": "Master Items-Test Stand", "sheetId": 99}},
+            ]
+        }
+
+        delete_start_indexes = []
+
+        def capture_batch(spreadsheetId, body):
+            requests = body.get("requests", [])
+            if requests and "deleteDimension" in requests[0]:
+                req = requests[0]["deleteDimension"]["range"]
+                delete_start_indexes.append(req["startIndex"])
+            mock = MagicMock()
+            mock.execute.return_value = {}
+            return mock
+
+        service.spreadsheets.return_value.batchUpdate.side_effect = capture_batch
+
+        with patch.object(
+            Call_sheets,
+            "get_default_category_order_for_stand",
+            return_value=[("CAT_A", ["Apple"])],
+        ):
+            Call_sheets._sync_master_items_tab(
+                sheet, service, self.SPREADSHEET_ID, self.STAND
+            )
+
+        # Rows are deleted bottom-to-top to avoid index shifting during deletions.
+        self.assertEqual(delete_start_indexes, [3, 2])
+        self.assertNotIn(1, delete_start_indexes)
 
     def test_new_item_format_explicitly_sets_white_background_style(self):
         category_order = [("CAT_A", ["Apple", "Banana"])]
