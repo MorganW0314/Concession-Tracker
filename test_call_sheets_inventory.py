@@ -117,7 +117,6 @@ class InventoryRefactorTests(unittest.TestCase):
             stands,
             {"BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)", "NWSC", "REED ROAD", "TREMONT"},
         )
-        self.assertNotIn("Bevelhymer Yellow", stands)
 
     def test_poppi_raspberry_rose_name_and_restriction_are_canonical(self):
         self.assertIn("Poppi - Raspberry Rose", Call_sheets.BOTTLED_DRINKS)

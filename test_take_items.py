@@ -134,9 +134,11 @@ class ModifierItemsConstantTests(unittest.TestCase):
     def test_tofts_skip_items_includes_base_flavors(self):
         for flavor in ("Cookie Monster", "Blueberry Waffle Cone", "Vanilla", "Chocolate",
                        "Cookie Dough", "Brownie Bandit", "Birthday Cake", "Mint Chip",
-                       "Rainbow Sherbet", "PB S'Mores", "Cotton Candy", "Cotton Candy Ice Cream",
-                       "Cookies n' Cream"):
+                       "Rainbow Sherbet", "PB S'Mores", "Cookies n' Cream"):
             self.assertIn(flavor, _TOFTS_ICE_CREAM_SKIP_ITEMS)
+        # Square/POS exports have used both Cotton Candy names; keep both skipped.
+        self.assertIn("Cotton Candy", _TOFTS_ICE_CREAM_SKIP_ITEMS)
+        self.assertIn("Cotton Candy Ice Cream", _TOFTS_ICE_CREAM_SKIP_ITEMS)
 
     def test_tofts_skip_items_includes_scoop_variants(self):
         for variant in (

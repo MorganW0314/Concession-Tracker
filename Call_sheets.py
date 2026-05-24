@@ -1796,6 +1796,13 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
 
 
 def _is_item_available_at_stand(item_name, stand_name, category_name=None):
+    """Return whether an item should appear for a stand.
+
+    When category_name is provided, category-specific location overrides stored
+    as (category_name, item_name) tuple keys take precedence over plain item
+    name keys. This allows the same display name to be restricted differently
+    across categories (for example fountain vs bottled soda rows).
+    """
     if not stand_name:
         return True
 
