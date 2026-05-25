@@ -50,13 +50,11 @@ from Take_items import (
     BLOOM_POP_FLAVOR_SET_PREFIX,
     COMBO_BREAKDOWN,
     CRUNCHY_RARA_MODIFIER_PREFIX,
-    FLOAT_BREAKDOWN,
     HAM_CHICKEN_MODIFIER_SET,
     ICE_CREAM_FLAVOR_SET_PREFIX,
     ICE_CREAM_TOPPINGS_PREFIX,
     MODIFIER_ITEMS,
     POPPI_FLAVOR_SET_PREFIX,
-    RAINBOW_SHERBET_FLOAT_SODA,
     SLUSHIE_FLAVOR_SET_PREFIX,
     _TOFTS_ICE_CREAM_SKIP_ITEMS,
     take_items,
@@ -648,29 +646,24 @@ class CallSheetsAlignmentTests(unittest.TestCase):
         )
 
 
-class FloatBreakdownTests(unittest.TestCase):
-    """Verify FLOAT_BREAKDOWN constants and take_items() float deduction logic."""
+class ComboBreakdownTests(unittest.TestCase):
+    """Verify COMBO_BREAKDOWN constants and combo expansion logic in take_items()."""
 
     NON_BEVELHYMER = {
         "BEXLEY", "DEVON", "HILLIARD2 (EAST)", "HILLIARD1 (WEST)",
         "NWSC", "PTAC", "REED ROAD", "TREMONT",
     }
 
-    def test_float_breakdown_keys_present(self):
-        self.assertIn("Root Beer Float", FLOAT_BREAKDOWN)
-        self.assertIn("Rainbow Sherbet Float", FLOAT_BREAKDOWN)
+    def test_combo_breakdown_keys_present(self):
+        self.assertIn("Cannonball!!!", COMBO_BREAKDOWN)
+        self.assertIn("Root Beer Float", COMBO_BREAKDOWN)
+        self.assertIn("Rainbow Sherbet Float", COMBO_BREAKDOWN)
 
     def test_root_beer_float_components(self):
-        self.assertEqual(FLOAT_BREAKDOWN["Root Beer Float"], ["Root Beer", "Vanilla"])
+        self.assertEqual(COMBO_BREAKDOWN["Root Beer Float"], ["Root Beer", "Vanilla"])
 
     def test_rainbow_sherbet_float_default_components(self):
-        self.assertEqual(FLOAT_BREAKDOWN["Rainbow Sherbet Float"], ["Rainbow Sherbet", "7up"])
-
-    def test_rainbow_sherbet_float_soda_by_stand(self):
-        self.assertEqual(RAINBOW_SHERBET_FLOAT_SODA["PTAC"], "Starry")
-        self.assertEqual(RAINBOW_SHERBET_FLOAT_SODA["HILLIARD1 (WEST)"], "7up")
-        self.assertEqual(RAINBOW_SHERBET_FLOAT_SODA["TREMONT"], "7up")
-        self.assertEqual(RAINBOW_SHERBET_FLOAT_SODA["NWSC"], "7up")
+        self.assertEqual(COMBO_BREAKDOWN["Rainbow Sherbet Float"], ["Rainbow Sherbet", "7up"])
 
     def test_root_beer_float_deducts_components(self):
         path = _write_tmp_csv([
@@ -679,10 +672,7 @@ class FloatBreakdownTests(unittest.TestCase):
         ])
         try:
             result = take_items(path)
-            # Float item itself is present
-            self.assertIn("Root Beer Float", result)
-            self.assertEqual(result["Root Beer Float"]["sales"], 2)
-            # Components are also deducted
+            self.assertNotIn("Root Beer Float", result)
             self.assertIn("Root Beer", result)
             self.assertEqual(result["Root Beer"]["sales"], 2)
             self.assertIn("Vanilla", result)
@@ -697,8 +687,7 @@ class FloatBreakdownTests(unittest.TestCase):
         ])
         try:
             result = take_items(path)
-            self.assertIn("Rainbow Sherbet Float", result)
-            self.assertEqual(result["Rainbow Sherbet Float"]["sales"], 2)
+            self.assertNotIn("Rainbow Sherbet Float", result)
             self.assertIn("Rainbow Sherbet", result)
             self.assertEqual(result["Rainbow Sherbet"]["sales"], 2)
             self.assertIn("7up", result)
@@ -714,7 +703,7 @@ class FloatBreakdownTests(unittest.TestCase):
         ])
         try:
             result = take_items(path, stand_name="PTAC")
-            self.assertIn("Rainbow Sherbet Float", result)
+            self.assertNotIn("Rainbow Sherbet Float", result)
             self.assertIn("Rainbow Sherbet", result)
             self.assertIn("Starry", result)
             self.assertEqual(result["Starry"]["sales"], 2)
@@ -729,9 +718,23 @@ class FloatBreakdownTests(unittest.TestCase):
         ])
         try:
             result = take_items(path, stand_name="NWSC")
+            self.assertNotIn("Rainbow Sherbet Float", result)
             self.assertIn("7up", result)
             self.assertEqual(result["7up"]["sales"], 1)
             self.assertNotIn("Starry", result)
+        finally:
+            os.unlink(path)
+
+    def test_cannonball_deducts_vanilla(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Cannonball!!!", "Item Variation": "Regular",
+             "Units Sold": "2", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertNotIn("Cannonball!!!", result)
+            self.assertIn("Vanilla", result)
+            self.assertEqual(result["Vanilla"]["sales"], 2)
         finally:
             os.unlink(path)
 
@@ -748,13 +751,10 @@ class NewItemsInventoryTests(unittest.TestCase):
     def test_novelties_correct_square_names(self):
         for item in (
             "Bomb Pop",
-            "Cannonball!!!",
             "Cookie Sandwich",
             "Nerd Bomb Pop",
             "Power Puff Girl",
-            "Rainbow Sherbet Float",
             "Reese's Ice Cream",
-            "Root Beer Float",
             "Snickers Ice Cream Bar",
             "Sonic The Hedgehog",
             "Spiderman Ice Cream",
@@ -779,6 +779,9 @@ class NewItemsInventoryTests(unittest.TestCase):
             "Doughnut Packs",
         ):
             self.assertIn(item, SNACKS, f"{item!r} missing from SNACKS")
+
+    def test_oranges_removed_from_snacks(self):
+        self.assertNotIn("Oranges", SNACKS)
 
     def test_cannonball_restricted_to_non_bevelhymer(self):
         self.assertIn("Cannonball!!!", LOCATION_SPECIFIC_ITEM_STANDS)

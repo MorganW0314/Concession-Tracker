@@ -1505,13 +1505,10 @@ TOFTS_ICE_CREAM = [
 
 NOVELTIES = [
     "Bomb Pop",
-    "Cannonball!!!",
     "Cookie Sandwich",
     "Nerd Bomb Pop",
     "Power Puff Girl",
-    "Rainbow Sherbet Float",
     "Reese's Ice Cream",
-    "Root Beer Float",
     "Snickers Ice Cream Bar",
     "Sonic The Hedgehog",
     "Spiderman Ice Cream",
@@ -1635,7 +1632,6 @@ SNACKS = [
     "Pickles",
     "Go-Go Squeez",
     "Cuties (2/$1.00)",
-    "Oranges",
     "Granola Bar",
     "Popcorn",
     "Peanuts Shelled",
@@ -1676,6 +1672,118 @@ JANITORIAL = [
     "Paper Towels",
     "Trash Bags",
 ]
+
+QUANTITY_PER_CASE = {
+    # CANDY
+    "Airheads": 90,
+    "Airheads 2 for $1": 90,
+    "Sour Patch Kids": 24,
+    "Ring Pop": 44,
+    "Slime Lickers": 12,
+    "Xtremes": 18,
+    "Starburst": 36,
+    "Nerd's Clusters": 12,
+    "Cow Tail": 36,
+    "Swedish Fish": 24,
+    "Cotton Candy": 12,
+
+    # NOVELTIES
+    "Bomb Pop": 24,
+    "Cookie Sandwich": 24,
+    "Nerd Bomb Pop": 24,
+    # Current item list uses "Nerd Bomb Pop"; keep apostrophe alias for
+    # legacy/alternate naming seen in some exports.
+    "Nerd's Bomb Pop": 24,
+    "Power Puff Girl": 18,
+    "Reese's Ice Cream": 24,
+    "Snickers Ice Cream Bar": 24,
+    "Sonic The Hedgehog": 18,
+    "Spiderman Ice Cream": 20,
+    "Spongebob Ice Cream": 20,
+    "Strawberry Shortcake Bar": 24,
+    "Sundae Cone": 24,
+    "Twix Ice Cream Bar": 24,
+    "Slushie Mix": 10,
+
+    # ICE CREAM (Toft's)
+    "Brownie Bandit": 60,
+    "Birthday Cake": 60,
+    "Chocolate": 60,
+    "Cookie Dough": 60,
+    "Cookie Monster": 60,
+    "Cookies n' Cream": 60,
+    "Vanilla": 60,
+    "Cotton Candy Ice Cream": 60,
+    "Mint Chip": 60,
+    "Rainbow Sherbet": 60,
+    "PB S'Mores": 60,
+    "Blueberry Waffle Cone": 60,
+
+    # FOUNTAIN DRINKS
+    "7up": 640,
+    "Diet RC": 320,
+    "Dr. Pepper": 640,
+    "Lemonade": 320,
+    "Root Beer": 320,
+    "RC Cola": 640,
+    "Coke": 640,
+    "Diet Coke": 640,
+    "Diet Pepsi": 640,
+    "Mt. Dew": 640,
+    "Pepsi": 640,
+    "Starry": 640,
+
+    # BOTTLED DRINKS
+    "Bottled Water": 24,
+    "Gatorade - Red": 8,
+    "Gatorade - Blue": 8,
+    "Gatorade - Yellow": 8,
+    "Bloom Pop - Strawberry Cream": 24,
+    "Bloom Pop - Raspberry Lemonade": 24,
+    "Bloom Pop - Watermelon Lime": 24,
+    "Fairlife": 12,
+    "Iced Coffee - Vanilla": 12,
+    "Iced Coffee - Mocha": 12,
+    "Iced Coffee - Caramel": 12,
+    "Poppi - Watermelon": 12,
+    "Poppi - Wild Berry": 12,
+    "Poppi - Raspberry Rose": 12,
+
+    # FOOD
+    "Chicken Salad": 1,
+    "Chicken Caesar Salad": 1,
+    "Hot Dog": 50,
+    "Chili Sauce (cans)": 1,
+    "Pulled Pork (bags)": 1,
+    "Uncrustable": 24,
+    "Nacho Chips": 48,
+    "Nacho Cheese": 1,
+    "Hamburger Buns": 16,
+    "Hot Dog Buns": 16,
+    "Soft Pretzel": 10,
+    "Ham": 32,
+    "Cheese": 160,
+
+    # SNACKS
+    "Hummus": 16,
+    "Pita Chips": 30,
+    "Assorted Chips": 50,
+    "Goldfish": 36,
+    "Crunchy Ra-Ra Yogurt": 12,
+    "String Cheese": 24,
+    "Frozen Grapes": 8,
+    "Pickles": 16,
+    "Go-Go Squeez": 32,
+    "Granola Bar": 36,
+
+    # DISPOSABLES
+    "Nacho Trays": 500,
+    "Paper Cups": 1000,
+    "Frazil Cups": 300,
+    "Ice Cream Cones": 600,
+    "Ketchup": 1000,
+    "Mustard": 1000,
+}
 
 # ---------------------------------------------------------------------------
 # Ingredient / component items
@@ -1985,6 +2093,13 @@ def find_previous_week_sheet_name(service, spreadsheet_id, current_sheet_name, s
     return None  # No previous sheet found
 
 
+def _qty_per_case_value(item, stand_name):
+    if item == "Root Beer":
+        return 640 if stand_name == "PTAC" else 320
+    value = QUANTITY_PER_CASE.get(item)
+    return "" if value is None else value
+
+
 def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     """Append one week's inventory data as 12 new columns to the stand's sheet.
 
@@ -2289,7 +2404,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
                 expected_formula,                    # Expected (formula)
                 "",                                  # Individuals   (employee fills in)
                 "",                                  # Cases/Packs   (employee fills in)
-                "",                                  # Qty Per Case  (employee fills in)
+                _qty_per_case_value(item, stand_name),  # Qty Per Case
                 actual_formula,                      # Actual = Ind + Cases×Qty
                 variance_formula,                    # Variance = Actual − Expected
                 item_data.get("scoops_used", 0) if is_tofts else "",  # Scoops Used

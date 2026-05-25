@@ -293,6 +293,14 @@ class InventoryRefactorTests(unittest.TestCase):
             reed_hot_dogs = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_hot_dogs["Hot Dogs"], 1998)
 
+    def test_qty_per_case_value_is_root_beer_stand_aware(self):
+        self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "PTAC"), 640)
+        self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "NWSC"), 320)
+
+    def test_qty_per_case_value_uses_mapping_and_blanks_unknown(self):
+        self.assertEqual(Call_sheets._qty_per_case_value("Poppi - Wild Berry", "PTAC"), 12)
+        self.assertEqual(Call_sheets._qty_per_case_value("Big Red", "PTAC"), "")
+
     def test_snacks_include_granola_and_split_crunchy_rara_flavors(self):
         self.assertIn("Granola Bar", Call_sheets.SNACKS)
         self.assertIn("Crunchy Ra-Ra - Mango", Call_sheets.SNACKS)
