@@ -23,27 +23,9 @@ COMBO_BREAKDOWN = {
     "Whole Jet's Pizza": ["Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice", "Pizza Slice"],
     "Pulled Pork Combo Meal": ["Pulled Pork Sandwich", "Assorted Chips"],
     "Pulled Pork COMBO": ["Pulled Pork Sandwich", "Assorted Chips"],
-}
-
-# Floats: the float item itself is counted normally in inventory; these
-# components are ALSO deducted from their respective inventory totals.
-_DEFAULT_RAINBOW_SHERBET_SODA = "7up"
-
-FLOAT_BREAKDOWN = {
+    "Cannonball!!!": ["Vanilla"],
     "Root Beer Float": ["Root Beer", "Vanilla"],
-    # Default soda component for Rainbow Sherbet Float is 7up; overridden at
-    # PTAC via RAINBOW_SHERBET_FLOAT_SODA when stand_name is known.
-    "Rainbow Sherbet Float": ["Rainbow Sherbet", _DEFAULT_RAINBOW_SHERBET_SODA],
-}
-
-# Stand-specific soda component for Rainbow Sherbet Float.
-# PTAC uses Starry; all other eligible stands (HILLIARD1 (WEST), TREMONT, NWSC)
-# use 7up (which is already the default in FLOAT_BREAKDOWN).
-RAINBOW_SHERBET_FLOAT_SODA = {
-    "PTAC": "Starry",
-    "HILLIARD1 (WEST)": _DEFAULT_RAINBOW_SHERBET_SODA,
-    "TREMONT": _DEFAULT_RAINBOW_SHERBET_SODA,
-    "NWSC": _DEFAULT_RAINBOW_SHERBET_SODA,
+    "Rainbow Sherbet Float": ["Rainbow Sherbet", "7up"],
 }
 
 MODIFIER_ITEMS = {
@@ -232,7 +214,10 @@ def take_items(csv_file_path, stand_name=None):
                 continue
 
             if item in COMBO_BREAKDOWN:
-                for comp in COMBO_BREAKDOWN[item]:
+                components = list(COMBO_BREAKDOWN[item])
+                if item == "Rainbow Sherbet Float" and stand_name == "PTAC":
+                    components = ["Starry" if c == "7up" else c for c in components]
+                for comp in components:
                     if comp not in rows:
                         rows[comp] = {
                             "starting": 0,
@@ -243,7 +228,7 @@ def take_items(csv_file_path, stand_name=None):
                     rows[comp]["sales"] += net_sales
                 _logger.debug(
                     "Combo %r expanded to %s (qty=%d)",
-                    item, COMBO_BREAKDOWN[item], net_sales,
+                    item, components, net_sales,
                 )
                 continue  # skip adding the combo itself
 
@@ -256,33 +241,6 @@ def take_items(csv_file_path, stand_name=None):
                 }
 
             rows[item]["sales"] += net_sales
-
-            # Float deduction: float item itself is counted above; also
-            # deduct each component from its respective inventory total.
-            if item in FLOAT_BREAKDOWN:
-                components = list(FLOAT_BREAKDOWN[item])
-                # For Rainbow Sherbet Float, override the soda component
-                # based on the stand (PTAC uses Starry; others use 7up).
-                if item == "Rainbow Sherbet Float" and stand_name:
-                    soda_override = RAINBOW_SHERBET_FLOAT_SODA.get(stand_name)
-                    if soda_override:
-                        components = [
-                            soda_override if c == _DEFAULT_RAINBOW_SHERBET_SODA else c
-                            for c in components
-                        ]
-                for comp in components:
-                    if comp not in rows:
-                        rows[comp] = {
-                            "starting": 0,
-                            "deliveries": 0,
-                            "sales": 0,
-                            "spoilage": 0,
-                        }
-                    rows[comp]["sales"] += net_sales
-                _logger.debug(
-                    "Float %r deducted components %s (qty=%d)",
-                    item, components, net_sales,
-                )
 
     _logger.info(
         "CSV read complete: %d raw rows, %d items loaded, "
