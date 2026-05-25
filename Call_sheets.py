@@ -1792,6 +1792,7 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Popcorn": {"TREMONT", "REED ROAD", "NWSC"},
     "Milky Way": CHOCOLATE_BAR_STANDS,
     "Snickers": CHOCOLATE_BAR_STANDS,
+    "Twix"  : CHOCOLATE_BAR_STANDS,
     "Big League Chew": BEVELHYMER_STANDS,
     "Skittles": BEVELHYMER_STANDS,
     "M&M - Peanut": MMS_STANDS,
