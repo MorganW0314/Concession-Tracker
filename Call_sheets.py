@@ -1533,6 +1533,7 @@ CANDY = [
     "Cow Tail",
     "Milky Way",
     "Snickers",
+    "Twix",
     "M&M - Peanut",
     "M&M - Regular",
     "Swedish Fish",
