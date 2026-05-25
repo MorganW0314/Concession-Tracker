@@ -1690,7 +1690,8 @@ QUANTITY_PER_CASE = {
     "Bomb Pop": 24,
     "Cookie Sandwich": 24,
     "Nerd Bomb Pop": 24,
-    # Keep apostrophe variant for legacy/alternate naming.
+    # Current item list uses "Nerd Bomb Pop"; keep apostrophe alias for
+    # legacy/alternate naming seen in some exports.
     "Nerd's Bomb Pop": 24,
     "Power Puff Girl": 18,
     "Reese's Ice Cream": 24,
