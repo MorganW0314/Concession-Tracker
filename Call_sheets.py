@@ -888,6 +888,12 @@ def calculate_ingredients_per_stand(rows, ingredient_map=None, stand_name=None):
     the raw number of that item sold.  Only the derived ingredient rows
     (e.g. "Bun", "Chili (1oz scoop)") are created/updated here.
 
+    stand_name is used for stand-specific fountain syrup bag sizing
+    during ounce-to-bag conversion (PTAC Root Beer uses 640oz bags;
+    non-PTAC Root Beer and all other stands default to 320oz unless
+    a stand-specific value exists in SYRUP_BAG_SIZES). When stand_name
+    is not provided, fountain conversion falls back to 320oz bags.
+
     This function modifies *rows* in-place and also returns it.
     """
     if ingredient_map is None:
@@ -928,6 +934,8 @@ def calculate_ingredients_per_stand(rows, ingredient_map=None, stand_name=None):
         if slices_used > 0:
             rows["Cheese"]["sales"] = round(slices_used / CHEESE_SLICES_PER_PACKAGE, 2)
 
+    fountain_stand_name = stand_name or ""
+
     # Convert fountain drink ounces to bags for sheet display.
     for fountain_drink in FOUNTAIN_DRINKS:
         if fountain_drink in rows:
@@ -935,9 +943,9 @@ def calculate_ingredients_per_stand(rows, ingredient_map=None, stand_name=None):
             if oz_used > 0:
                 # Stand-aware bag size (PTAC Root Beer = 640oz, others = 320oz).
                 if fountain_drink == "Root Beer":
-                    bag_size = 640 if stand_name == "PTAC" else 320
+                    bag_size = 640 if fountain_stand_name == "PTAC" else 320
                 else:
-                    bag_size = SYRUP_BAG_SIZES.get(stand_name, 320)
+                    bag_size = SYRUP_BAG_SIZES.get(fountain_stand_name, 320)
                 rows[fountain_drink]["sales"] = round(oz_used / bag_size, 2)
 
     # Convert slushie servings to bags for sheet display.
