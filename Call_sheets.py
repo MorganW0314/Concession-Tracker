@@ -1703,7 +1703,11 @@ QUANTITY_PER_CASE = {
     "Strawberry Shortcake Bar": 24,
     "Sundae Cone": 24,
     "Twix Ice Cream Bar": 24,
-    "Slushie Mix": 10,
+    "Slushie - Mango": 10,
+    "Slushie - Blue Razz": 10,
+    "Slushie - Tiger's Blood": 10,
+    "Slushie - Green Apple": 10,
+    "Slushie - Peach": 10,
 
     # ICE CREAM (Toft's)
     "Brownie Bandit": 60,
