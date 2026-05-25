@@ -127,6 +127,23 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(result["Chili Sauce (cans)"]["sales"], 1.0)
         self.assertEqual(result["Pulled Pork (bags)"]["sales"], 1.0)
 
+    def test_calculate_ingredients_per_stand_converts_fountain_slushie_and_grapes(self):
+        rows = {
+            "Dr. Pepper": {"sales": 640},
+            "Root Beer": {"sales": 640},
+            "Slushie - Mango": {"sales": 25},
+            "Frozen Grapes": {"sales": 12},
+        }
+        result = Call_sheets.calculate_ingredients_per_stand(rows, stand_name="PTAC")
+        self.assertEqual(result["Dr. Pepper"]["sales"], 1.0)
+        self.assertEqual(result["Root Beer"]["sales"], 1.0)
+        self.assertEqual(result["Slushie - Mango"]["sales"], 2.5)
+        self.assertEqual(result["Frozen Grapes"]["sales"], 1.5)
+
+        non_ptac_rows = {"Root Beer": {"sales": 320}}
+        non_ptac_result = Call_sheets.calculate_ingredients_per_stand(non_ptac_rows, stand_name="NWSC")
+        self.assertEqual(non_ptac_result["Root Beer"]["sales"], 1.0)
+
     def test_ham_and_cheese_package_conversion_constants(self):
         self.assertEqual(Call_sheets.HAM_SLICES_PER_PACKAGE, 32)
         self.assertEqual(Call_sheets.CHEESE_SLICES_PER_PACKAGE, 160)
@@ -293,13 +310,18 @@ class InventoryRefactorTests(unittest.TestCase):
             reed_hot_dogs = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_hot_dogs["Hot Dogs"], 1998)
 
-    def test_qty_per_case_value_is_root_beer_stand_aware(self):
-        self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "PTAC"), 640)
-        self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "NWSC"), 320)
+    def test_qty_per_case_value_for_root_beer_uses_physical_bag_units(self):
+        self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "PTAC"), 1)
+        self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "NWSC"), 1)
 
     def test_qty_per_case_value_uses_mapping_and_blanks_unknown(self):
         self.assertEqual(Call_sheets._qty_per_case_value("Poppi - Wild Berry", "PTAC"), 12)
         self.assertEqual(Call_sheets._qty_per_case_value("Big Red", "PTAC"), "")
+
+    def test_qty_per_case_uses_physical_units_for_tofts_fountain_and_grapes(self):
+        self.assertEqual(Call_sheets.QUANTITY_PER_CASE["Vanilla"], 1)
+        self.assertEqual(Call_sheets.QUANTITY_PER_CASE["Dr. Pepper"], 1)
+        self.assertEqual(Call_sheets.QUANTITY_PER_CASE["Frozen Grapes"], 1)
 
     def test_snacks_include_granola_and_split_crunchy_rara_flavors(self):
         self.assertIn("Granola Bar", Call_sheets.SNACKS)
