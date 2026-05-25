@@ -50,6 +50,7 @@ SLUSHIE_OZ_PER_SERVING = 16
 SLUSHIE_OZ_PER_BAG = SLUSHIE_SERVINGS_PER_BAG * SLUSHIE_OZ_PER_SERVING  # = 160oz
 SLUSHIE_SERVINGS_PER_CONTAINER = SLUSHIE_SERVINGS_PER_BAG * SLUSHIE_BAGS_PER_CONTAINER  # = 30
 SLUSHIE_OZ_PER_CONTAINER = SLUSHIE_SERVINGS_PER_CONTAINER * SLUSHIE_OZ_PER_SERVING  # = 480oz
+GRAPES_SERVINGS_PER_CONTAINER = 8
 
 # Chicken salad conversion constants.
 # Delivered in 48oz tubs; each sandwich uses a 4oz scoop (12 scoops per tub).
@@ -876,7 +877,7 @@ def map_item_to_ingredients(item_name, quantity, ingredient_map=None):
     return result
 
 
-def calculate_ingredients_per_stand(rows, ingredient_map=None):
+def calculate_ingredients_per_stand(rows, ingredient_map=None, stand_name=None):
     """Expand CSV sales into ingredient-level usage for a single stand.
 
     For each item that has an entry in INGREDIENT_MAP, the additional
@@ -886,6 +887,12 @@ def calculate_ingredients_per_stand(rows, ingredient_map=None):
     The original item's own row is left untouched – it continues to show
     the raw number of that item sold.  Only the derived ingredient rows
     (e.g. "Bun", "Chili (1oz scoop)") are created/updated here.
+
+    stand_name is used for stand-specific fountain syrup bag sizing
+    during ounce-to-bag conversion (PTAC Root Beer uses 640oz bags;
+    non-PTAC Root Beer and all other stands default to 320oz unless
+    a stand-specific value exists in SYRUP_BAG_SIZES). When stand_name
+    is not provided, fountain conversion falls back to 320oz bags.
 
     This function modifies *rows* in-place and also returns it.
     """
@@ -926,6 +933,33 @@ def calculate_ingredients_per_stand(rows, ingredient_map=None):
         slices_used = rows["Cheese"].get("sales", 0)
         if slices_used > 0:
             rows["Cheese"]["sales"] = round(slices_used / CHEESE_SLICES_PER_PACKAGE, 2)
+
+    fountain_stand_name = stand_name or ""
+
+    # Convert fountain drink ounces to bags for sheet display.
+    for fountain_drink in FOUNTAIN_DRINKS:
+        if fountain_drink in rows:
+            oz_used = rows[fountain_drink].get("sales", 0)
+            if oz_used > 0:
+                # Stand-aware bag size (PTAC Root Beer = 640oz, others = 320oz).
+                if fountain_drink == "Root Beer":
+                    bag_size = 640 if fountain_stand_name == "PTAC" else 320
+                else:
+                    bag_size = SYRUP_BAG_SIZES.get(fountain_stand_name, 320)
+                rows[fountain_drink]["sales"] = round(oz_used / bag_size, 2)
+
+    # Convert slushie servings to bags for sheet display.
+    for slushie_flavor in SLUSHIE_FLAVORS:
+        if slushie_flavor in rows:
+            servings_sold = rows[slushie_flavor].get("sales", 0)
+            if servings_sold > 0:
+                rows[slushie_flavor]["sales"] = round(servings_sold / SLUSHIE_SERVINGS_PER_BAG, 2)
+
+    # Convert frozen grapes servings to containers for sheet display.
+    if "Frozen Grapes" in rows:
+        servings_sold = rows["Frozen Grapes"].get("sales", 0)
+        if servings_sold > 0:
+            rows["Frozen Grapes"]["sales"] = round(servings_sold / GRAPES_SERVINGS_PER_CONTAINER, 2)
 
     return rows
 
@@ -1710,32 +1744,32 @@ QUANTITY_PER_CASE = {
     "Slushie - Peach": 10,
 
     # ICE CREAM (Toft's)
-    "Brownie Bandit": 60,
-    "Birthday Cake": 60,
-    "Chocolate": 60,
-    "Cookie Dough": 60,
-    "Cookie Monster": 60,
-    "Cookies n' Cream": 60,
-    "Vanilla": 60,
-    "Cotton Candy Ice Cream": 60,
-    "Mint Chip": 60,
-    "Rainbow Sherbet": 60,
-    "PB S'Mores": 60,
-    "Blueberry Waffle Cone": 60,
+    "Brownie Bandit": 1,
+    "Birthday Cake": 1,
+    "Chocolate": 1,
+    "Cookie Dough": 1,
+    "Cookie Monster": 1,
+    "Cookies n' Cream": 1,
+    "Vanilla": 1,
+    "Cotton Candy Ice Cream": 1,
+    "Mint Chip": 1,
+    "Rainbow Sherbet": 1,
+    "PB S'Mores": 1,
+    "Blueberry Waffle Cone": 1,
 
     # FOUNTAIN DRINKS
-    "7up": 640,
-    "Diet RC": 320,
-    "Dr. Pepper": 640,
-    "Lemonade": 320,
-    "Root Beer": 320,
-    "RC Cola": 640,
-    "Coke": 640,
-    "Diet Coke": 640,
-    "Diet Pepsi": 640,
-    "Mt. Dew": 640,
-    "Pepsi": 640,
-    "Starry": 640,
+    "7up": 1,
+    "Diet RC": 1,
+    "Dr. Pepper": 1,
+    "Lemonade": 1,
+    "Root Beer": 1,
+    "RC Cola": 1,
+    "Coke": 1,
+    "Diet Coke": 1,
+    "Diet Pepsi": 1,
+    "Mt. Dew": 1,
+    "Pepsi": 1,
+    "Starry": 1,
 
     # BOTTLED DRINKS
     "Bottled Water": 24,
@@ -1775,7 +1809,7 @@ QUANTITY_PER_CASE = {
     "Goldfish": 36,
     "Crunchy Ra-Ra Yogurt": 12,
     "String Cheese": 24,
-    "Frozen Grapes": 8,
+    "Frozen Grapes": 1,
     "Pickles": 16,
     "Go-Go Squeez": 32,
     "Granola Bar": 36,
@@ -2098,8 +2132,6 @@ def find_previous_week_sheet_name(service, spreadsheet_id, current_sheet_name, s
 
 
 def _qty_per_case_value(item, stand_name):
-    if item == "Root Beer":
-        return 640 if stand_name == "PTAC" else 320
     value = QUANTITY_PER_CASE.get(item)
     return "" if value is None else value
 
@@ -2161,7 +2193,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     # ingredient rows (Bun, Chili scoop, etc.) are in `rows` when that
     # loop checks them.
     # ============================
-    calculate_ingredients_per_stand(rows)
+    calculate_ingredients_per_stand(rows, stand_name=stand_name)
 
     # ============================
     # ENSURE STAND SHEET EXISTS (creates it with items in col A if absent)
