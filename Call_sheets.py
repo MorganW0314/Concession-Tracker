@@ -1631,6 +1631,7 @@ SLUSHIE_FLAVORS = [
 
 FOOD = [
     "Pizza Slice",
+    "Chicken Salad",
     "Chicken Caesar Salad",
     "Hot Dog",
     "Chili Sauce (cans)",
@@ -1684,12 +1685,15 @@ DISPOSABLES = [
     "Forks",
     "Knives",
     "Paper Cups",
+    "Tofts cups  (by sleeve)",
     "Souvenir Cups",
-    "Frazil Cups",
+    "Frazil Cups (by box or sleeves)",
+    "Frazil straws (by individual box)",
     "Ice Cream Cones",
-    "Ketchup",
-    "Mustard",
+    "Ketchup (decimal estimate)",
+    "Mustard (decimal estimate)",
     "CO2 Tanks",
+    "Plastic Wrap (count by box)",
 ]
 
 
@@ -1698,13 +1702,57 @@ DISPOSABLES = [
 
 
 JANITORIAL = [
-    "Dish Soap",
-    "Floor Cleaner",
-    "Sanitizer Tablets",
-    "Gloves",
+    "Dish Soap(estimate)",
+    "Floor Cleaner(estimate)",
+    "Sanitizer Tablets ( decimal estimate bottle)",
+    "Gloves (count in boxes)",
     "Hand Soap",
-    "Paper Towels",
-    "Trash Bags",
+    "Paper Towels (count in rolls)",
+    "Trash Bags (count in rolls)",
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ]
 
 QUANTITY_PER_CASE = {
@@ -1759,6 +1807,7 @@ QUANTITY_PER_CASE = {
 
     # FOUNTAIN DRINKS
     "7up": 1,
+    "Big Red": 1,
     "Diet RC": 1,
     "Dr. Pepper": 1,
     "Lemonade": 1,
@@ -1768,6 +1817,40 @@ QUANTITY_PER_CASE = {
     "Diet Coke": 1,
     "Diet Pepsi": 1,
     "Mt. Dew": 1,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     "Pepsi": 1,
     "Starry": 1,
 
@@ -1807,20 +1890,35 @@ QUANTITY_PER_CASE = {
     "Pita Chips": 30,
     "Assorted Chips": 50,
     "Goldfish": 36,
-    "Crunchy Ra-Ra Yogurt": 12,
+    "Crunchy Ra-Ra - Mango": 12,
+    "Crunchy Ra-Ra - Sprinkles": 12,
+    "Crunchy Ra-Ra - Strawberry": 12,
     "String Cheese": 24,
     "Frozen Grapes": 1,
     "Pickles": 16,
     "Go-Go Squeez": 32,
     "Granola Bar": 36,
+    "Rainbow Sprinkles": 1,
+    "Whipped Cream": 1,
+    "Popcorn": 36,
 
     # DISPOSABLES
     "Nacho Trays": 500,
     "Paper Cups": 1000,
-    "Frazil Cups": 300,
+    "Frazil Cups (by box or sleeves)": 300,
+    "Frazil straws (by individual box)":300,
     "Ice Cream Cones": 600,
-    "Ketchup": 1000,
-    "Mustard": 1000,
+    "Tofts cups  (by sleeve)": 50,
+    "Ketchup (decimal estimate)" :1000,
+    "Mustard (decimal estimate)": 1000,
+    "Forks": 600,
+    "Spoons": 600,
+    "Knives": 600,
+    "Napkins": 250,
+    "Pretzel Sleeves": 1000,
+    "Sandwich Trays": 750,
+    "Plastic Wrap (count by box)": 1,
+
 }
 
 # ---------------------------------------------------------------------------
