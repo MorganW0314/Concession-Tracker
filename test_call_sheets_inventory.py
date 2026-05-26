@@ -317,6 +317,10 @@ class InventoryRefactorTests(unittest.TestCase):
     def test_qty_per_case_value_uses_mapping_and_blanks_unknown(self):
         self.assertEqual(Call_sheets._qty_per_case_value("Poppi - Wild Berry", "PTAC"), 12)
         self.assertEqual(Call_sheets._qty_per_case_value("Not A Real Item", "PTAC"), "")
+        self.assertEqual(
+            Call_sheets._qty_per_case_value("Not A Real Item", "PTAC", "FOUNTAIN_DRINKS"),
+            "",
+        )
 
     def test_qty_per_case_uses_physical_units_for_tofts_fountain_and_grapes(self):
         self.assertEqual(Call_sheets.QUANTITY_PER_CASE["Vanilla"], 1)

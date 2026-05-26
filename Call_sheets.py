@@ -2252,6 +2252,12 @@ def find_previous_week_sheet_name(service, spreadsheet_id, current_sheet_name, s
 
 
 def _qty_per_case_value(item, stand_name, category_name=None):
+    """Return qty-per-case for an item, preferring category-specific mappings.
+
+    When category_name is provided, this first checks tuple keys of the form
+    (category_name, item) for category-aware overrides (used for colliding item
+    names across categories), then falls back to a plain item-name lookup.
+    """
     if category_name:
         category_value = QUANTITY_PER_CASE.get((category_name, item))
         if category_value is not None:
