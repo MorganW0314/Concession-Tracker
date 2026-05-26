@@ -1692,6 +1692,7 @@ DISPOSABLES = [
     "Mustard (decimal estimate)",
     "CO2 Tanks",
     "Plastic Wrap (count by box)",
+    "Popcorn Boxes",
 ]
 
 
@@ -1878,9 +1879,9 @@ QUANTITY_PER_CASE = {
     "Gatorade - Red": 8,
     "Gatorade - Blue": 8,
     "Gatorade - Yellow": 8,
-    "Bloom Pop - Strawberry Cream": 24,
-    "Bloom Pop - Raspberry Lemonade": 24,
-    "Bloom Pop - Watermelon Lime": 24,
+    "Bloom Pop - Strawberry Cream": 14,
+    "Bloom Pop - Raspberry Lemonade": 14,
+    "Bloom Pop - Watermelon Lime": 14,
     "Fairlife": 12,
     "Iced Coffee - Vanilla": 12,
     "Iced Coffee - Mocha": 12,
@@ -1938,6 +1939,7 @@ QUANTITY_PER_CASE = {
     "Pretzel Sleeves": 1000,
     "Sandwich Trays": 750,
     "Plastic Wrap (count by box)": 1,
+    "Popcorn Boxes": 500,
 
 }
 
@@ -2054,7 +2056,8 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Poppi - Watermelon": PTAC_ONLY,
     "Poppi - Wild Berry": PTAC_ONLY,
     "Poppi - Raspberry Rose": PTAC_ONLY,
-    "Popcorn": {"TREMONT", "REED ROAD", "NWSC"},
+    "Popcorn": {"TREMONT", "REED ROAD", "NWSC", "Bevelhymer Green", "Bevelhymer Yellow"},  # ← ADD both Bevelhymer stands
+    "Popcorn Boxes": {"TREMONT", "REED ROAD", "NWSC", "Bevelhymer Green", "Bevelhymer Yellow"},  # ← ADD both Bevelhymer stands
     "Milky Way": CHOCOLATE_BAR_STANDS,
     "Snickers": CHOCOLATE_BAR_STANDS,
     "Twix"  : CHOCOLATE_BAR_STANDS,
