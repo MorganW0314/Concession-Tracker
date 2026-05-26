@@ -1816,14 +1816,14 @@ QUANTITY_PER_CASE = {
     "7up": 1,
     "Big Red": 1,
     "Diet RC": 1,
-    "Dr. Pepper": 1,
+    ("FOUNTAIN_DRINKS", "Dr. Pepper"): 1,
     "Lemonade": 1,
     "Root Beer": 1,
     "RC Cola": 1,
-    "Coke": 1,
+    ("FOUNTAIN_DRINKS", "Coke"): 1,
     "Diet Coke": 1,
     "Diet Pepsi": 1,
-    "Mt. Dew": 1,
+    ("FOUNTAIN_DRINKS", "Mt. Dew"): 1,
 
 
 
@@ -1867,10 +1867,10 @@ QUANTITY_PER_CASE = {
     "AW Root Beer": 12,
     "Bubly - Green": 12,
     "Bubly - Red": 12,
-    "Coke": 24,
+    ("BOTTLED_DRINKS", "Coke"): 24,
     "Diet Mt. Dew": 12,
-    "Dr. Pepper": 12,
-    "Mt. Dew": 12,
+    ("BOTTLED_DRINKS", "Dr. Pepper"): 12,
+    ("BOTTLED_DRINKS", "Mt. Dew"): 12,
     "Peach Tea": 12,
     "RC": 12,
     "Sprite": 12,
@@ -2251,7 +2251,11 @@ def find_previous_week_sheet_name(service, spreadsheet_id, current_sheet_name, s
     return None  # No previous sheet found
 
 
-def _qty_per_case_value(item, stand_name):
+def _qty_per_case_value(item, stand_name, category_name=None):
+    if category_name:
+        category_value = QUANTITY_PER_CASE.get((category_name, item))
+        if category_value is not None:
+            return category_value
     value = QUANTITY_PER_CASE.get(item)
     return "" if value is None else value
 
@@ -2560,7 +2564,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
                 expected_formula,                    # Expected (formula)
                 "",                                  # Individuals   (employee fills in)
                 "",                                  # Cases/Packs   (employee fills in)
-                _qty_per_case_value(item, stand_name),  # Qty Per Case
+                _qty_per_case_value(item, stand_name, category_name),  # Qty Per Case
                 actual_formula,                      # Actual = Ind + Cases×Qty
                 variance_formula,                    # Variance = Actual − Expected
                 item_data.get("scoops_used", 0) if is_tofts else "",  # Scoops Used

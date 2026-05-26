@@ -316,12 +316,27 @@ class InventoryRefactorTests(unittest.TestCase):
 
     def test_qty_per_case_value_uses_mapping_and_blanks_unknown(self):
         self.assertEqual(Call_sheets._qty_per_case_value("Poppi - Wild Berry", "PTAC"), 12)
-        self.assertEqual(Call_sheets._qty_per_case_value("Big Red", "PTAC"), "")
+        self.assertEqual(Call_sheets._qty_per_case_value("Not A Real Item", "PTAC"), "")
 
     def test_qty_per_case_uses_physical_units_for_tofts_fountain_and_grapes(self):
         self.assertEqual(Call_sheets.QUANTITY_PER_CASE["Vanilla"], 1)
-        self.assertEqual(Call_sheets.QUANTITY_PER_CASE["Dr. Pepper"], 1)
+        self.assertEqual(Call_sheets.QUANTITY_PER_CASE[("FOUNTAIN_DRINKS", "Dr. Pepper")], 1)
+        self.assertEqual(Call_sheets.QUANTITY_PER_CASE[("BOTTLED_DRINKS", "Dr. Pepper")], 12)
         self.assertEqual(Call_sheets.QUANTITY_PER_CASE["Frozen Grapes"], 1)
+
+    def test_qty_per_case_value_prefers_category_specific_collisions(self):
+        self.assertEqual(
+            Call_sheets._qty_per_case_value("Coke", "PTAC", "FOUNTAIN_DRINKS"),
+            1,
+        )
+        self.assertEqual(
+            Call_sheets._qty_per_case_value("Coke", "PTAC", "BOTTLED_DRINKS"),
+            24,
+        )
+        self.assertEqual(
+            Call_sheets._qty_per_case_value("Root Beer", "PTAC", "FOUNTAIN_DRINKS"),
+            1,
+        )
 
     def test_snacks_include_granola_and_split_crunchy_rara_flavors(self):
         self.assertIn("Granola Bar", Call_sheets.SNACKS)
