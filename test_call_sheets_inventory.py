@@ -314,7 +314,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "PTAC"), 1)
         self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "NWSC"), 1)
 
-    def test_qty_per_case_value_uses_mapping_and_blanks_unknown(self):
+    def test_qty_per_case_value_returns_blank_for_unknown_items(self):
         self.assertEqual(Call_sheets._qty_per_case_value("Poppi - Wild Berry", "PTAC"), 12)
         self.assertEqual(Call_sheets._qty_per_case_value("Not A Real Item", "PTAC"), "")
 
