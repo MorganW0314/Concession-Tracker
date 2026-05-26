@@ -333,6 +333,8 @@ class InventoryRefactorTests(unittest.TestCase):
             Call_sheets._qty_per_case_value("Coke", "PTAC", "BOTTLED_DRINKS"),
             24,
         )
+
+    def test_qty_per_case_value_falls_back_to_plain_item_lookup(self):
         self.assertEqual(
             Call_sheets._qty_per_case_value("Root Beer", "PTAC", "FOUNTAIN_DRINKS"),
             1,
