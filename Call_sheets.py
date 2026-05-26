@@ -1670,9 +1670,7 @@ SNACKS = [
     "Granola Bar",
     "Popcorn",
     "Peanuts Shelled",
-    "Kars",
     "Fig Bars",
-    "Doughnut Packs",
 ]
 
 DISPOSABLES = [
@@ -1867,7 +1865,7 @@ QUANTITY_PER_CASE = {
     "AW Root Beer": 12,
     "Bubly - Green": 12,
     "Bubly - Red": 12,
-    "Coke": 24,
+    "Coke": 12,
     "Diet Mt. Dew": 12,
     "Dr. Pepper": 12,
     "Mt. Dew": 12,
@@ -2093,9 +2091,7 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Rainbow Sherbet Float": RAINBOW_SHERBET_FLOAT_STANDS,
     # Snacks — Bevelhymer only
     "Peanuts Shelled": BEVELHYMER_STANDS,
-    "Kars": BEVELHYMER_STANDS,
     "Fig Bars": BEVELHYMER_STANDS,
-    "Doughnut Packs": BEVELHYMER_STANDS,
     # Bottled drinks — Bevelhymer restrictions
     "Fairlife": NON_BEVELHYMER_STANDS,
     "Peach Tea": BEVELHYMER_STANDS,
