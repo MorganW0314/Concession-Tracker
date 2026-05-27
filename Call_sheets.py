@@ -1997,6 +1997,10 @@ INGREDIENT_MAP = {
     # Snacks and frozen drinks
     "Hummus and Pita Chips": [("Hummus", 1), ("Pita Chips", 1)],
     "Slushie": [("Slushie Mix", 1), ("Frazil Cups", 1)],
+
+    # Cannonball: 1 scoop of vanilla ice cream is an inherent ingredient.
+    # The slushie flavor is chosen by the customer via modifier and is tracked separately.
+    "Cannonball!!!": [("Vanilla", 1)],
 }
 
 PREMIUM_ICE_CREAM_ITEMS = {

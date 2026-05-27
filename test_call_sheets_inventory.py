@@ -57,6 +57,14 @@ class InventoryRefactorTests(unittest.TestCase):
             [("Slushie Mix", 1), ("Frazil Cups", 1)],
         )
 
+    def test_ingredient_map_cannonball_uses_one_vanilla_scoop(self):
+        # Cannonball must map to exactly 1 scoop of Vanilla (inherent ingredient).
+        # The slushie flavour is customer-selected via modifier and tracked separately.
+        self.assertEqual(
+            Call_sheets.INGREDIENT_MAP["Cannonball!!!"],
+            [("Vanilla", 1)],
+        )
+
     def test_ingredient_map_tracks_chili_and_pulled_pork_scoops(self):
         self.assertEqual(
             Call_sheets.INGREDIENT_MAP["Walking Taco"],
