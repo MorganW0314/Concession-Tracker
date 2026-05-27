@@ -22,9 +22,9 @@ def normalize_item_name(name: str) -> str:
         .replace("\u2013", "-")
         .replace("\u2014", "-")
     )
-    normalized = normalized.strip()
-    normalized = _EXPLICIT_ITEM_NAME_MAPPINGS.get(normalized.casefold(), normalized)
+    normalized = normalized.strip().casefold()
+    normalized = _EXPLICIT_ITEM_NAME_MAPPINGS.get(normalized, normalized)
     normalized = re.sub(r"-{2,}", "-", normalized)
     normalized = re.sub(r"\s*-\s*", " - ", normalized)
     normalized = re.sub(r"\s+", " ", normalized)
-    return normalized.casefold()
+    return normalized
