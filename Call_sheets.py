@@ -1823,6 +1823,13 @@ QUANTITY_PER_CASE = {
     "Diet Coke": 1,
     "Diet Pepsi": 1,
     ("FOUNTAIN_DRINKS", "Mt. Dew"): 1,
+    "Dish Soap(estimate)": 1,
+    "Floor Cleaner(estimate)":1,
+    "Sanitizer Tablets ( decimal estimate bottle)":1,
+    "Gloves (count in boxes)" :1,
+    "Hand Soap":1,
+    "Paper Towels (count in rolls)":1,
+    "Trash Bags (count in rolls)":1,
 
 
 
