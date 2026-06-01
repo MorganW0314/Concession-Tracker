@@ -35,7 +35,7 @@ def normalize_item_name(name: str) -> str:
 
 
 def canonicalize_item_name(name: str) -> str:
-    """Return the canonical display name for known item aliases."""
+    """Return a canonical display name for known aliases, else preserve input."""
     if not name:
         return ""
 
