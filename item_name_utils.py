@@ -5,6 +5,10 @@ _EXPLICIT_ITEM_NAME_MAPPINGS = {
     "jumbo pickles": "pickles",
 }
 
+_CANONICAL_ITEM_NAME_ALIASES = {
+    "souvenir cup": "Souvenir Cups",
+}
+
 
 def normalize_item_name(name: str) -> str:
     """Normalize item names for comparisons only (not for display/writes)."""
@@ -28,3 +32,13 @@ def normalize_item_name(name: str) -> str:
     normalized = re.sub(r"\s*-\s*", " - ", normalized)
     normalized = re.sub(r"\s+", " ", normalized)
     return normalized
+
+
+def canonicalize_item_name(name: str) -> str:
+    """Return a canonical display name for known aliases, else preserve input."""
+    if not name:
+        return ""
+
+    stripped_name = str(name).strip()
+    normalized_name = normalize_item_name(stripped_name)
+    return _CANONICAL_ITEM_NAME_ALIASES.get(normalized_name, stripped_name)
