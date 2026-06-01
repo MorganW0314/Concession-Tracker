@@ -1349,13 +1349,15 @@ _TOFTS_BASE_FLAVORS = [
 # folds it into the correct base-flavor bucket.  Omitting a variant here
 # causes its sales/deliveries/spoilage to be silently dropped.
 #
-# This dict serves two purposes:
+# This dict serves the modifier / scoop-counting pipeline:
 #   1. group_scoops_by_flavor() – resolves variant name → base before counting
 #      scoops (handles names that don't auto-normalize, e.g. "Cotton Candy
 #      Double Scoop" → "cotton candy" ≠ "cotton candy ice cream").
-#   2. consolidate_variants_to_base() – merges ALL numeric row data
-#      (sales, deliveries, spoilage) from variant keys into base-flavor keys
-#      so the sheet's Sales column is populated correctly.
+#   2. merge_modifier_rows() – rolls modifier-sales flavor entries into the
+#      canonical base-flavor rows used by the sheet.
+#
+# Keep the bare "Cotton Candy" → "Cotton Candy Ice Cream" alias here because
+# modifier-sales exports can use the bare flavor name for genuine ice cream.
 SCOOP_VARIANT_TO_BASE: dict[str, str] = {
     # Brownie Bandit
     "Brownie Bandit":                     "Brownie Bandit",
@@ -1438,6 +1440,16 @@ SCOOP_VARIANT_TO_BASE: dict[str, str] = {
     "Vanilla Triple Scoop":               "Vanilla",
 }
 
+# Row consolidation runs on the main item-sales rows, where a bare
+# "Cotton Candy" row is the Candy item and must remain distinct. Keep the
+# modifier/scoop aliases above, but exclude this one ambiguous bare-name alias
+# from the map that consolidate_variants_to_base() iterates.
+CONSOLIDATE_VARIANT_TO_BASE: dict[str, str] = {
+    variant: base
+    for variant, base in SCOOP_VARIANT_TO_BASE.items()
+    if variant != "Cotton Candy"
+}
+
 
 def consolidate_variants_to_base(
     rows: dict,
@@ -1476,13 +1488,13 @@ def consolidate_variants_to_base(
                      Each data_dict may contain "sales", "deliveries",
                      "spoilage", "starting", and other numeric fields.
         variant_map: Mapping of variant_name -> base_name.  Defaults to
-                     SCOOP_VARIANT_TO_BASE.  Override only in tests.
+                     CONSOLIDATE_VARIANT_TO_BASE.  Override only in tests.
 
     Returns:
         The same ``rows`` dict (mutated in-place) for convenient chaining.
     """
     if variant_map is None:
-        variant_map = SCOOP_VARIANT_TO_BASE
+        variant_map = CONSOLIDATE_VARIANT_TO_BASE
 
     for variant, base in variant_map.items():
         if variant not in rows:

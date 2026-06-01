@@ -431,6 +431,32 @@ class InventoryRefactorTests(unittest.TestCase):
             {"Chocolate": {"sales": 2, "deliveries": 3, "spoilage": 1}},
         )
 
+    def test_consolidate_variants_keeps_cotton_candy_candy_and_folds_scoops(self):
+        rows = {
+            "Cotton Candy": {"sales": 17, "deliveries": 0, "spoilage": 0},
+            "Cotton Candy Ice Cream": {"sales": 4, "deliveries": 0, "spoilage": 0},
+            "Cotton Candy Double Scoop": {"sales": 3, "deliveries": 1, "spoilage": 2},
+        }
+
+        Call_sheets.consolidate_variants_to_base(rows)
+
+        self.assertIn("Cotton Candy", rows)
+        self.assertEqual(rows["Cotton Candy"]["sales"], 17)
+        self.assertNotIn("Cotton Candy Double Scoop", rows)
+        self.assertEqual(rows["Cotton Candy Ice Cream"]["sales"], 7)
+        self.assertEqual(rows["Cotton Candy Ice Cream"]["deliveries"], 1)
+        self.assertEqual(rows["Cotton Candy Ice Cream"]["spoilage"], 2)
+
+    def test_consolidate_variants_does_not_remove_bare_cotton_candy_row(self):
+        rows = {"Cotton Candy": {"sales": 17, "deliveries": 0, "spoilage": 0}}
+
+        Call_sheets.consolidate_variants_to_base(rows)
+
+        self.assertEqual(
+            rows,
+            {"Cotton Candy": {"sales": 17, "deliveries": 0, "spoilage": 0}},
+        )
+
     def test_get_default_category_order_for_stand_filters_location_items(self):
         bexley = dict(Call_sheets.get_default_category_order_for_stand("BEXLEY"))
         self.assertNotIn("Mint Chip", bexley["ICE_CREAM_TOFTS"])
