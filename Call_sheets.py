@@ -29,8 +29,7 @@ def get_sheet_id(service, spreadsheet_id, sheet_name):
 #         Scoops Used | Tubs Used
 COLS_PER_WEEK = 12
 
-# Number of scoops in one ice cream tub.  Used to convert "Tubs" deliveries
-# to scoops when the Deliveries tab includes a TYPE column.
+# Number of scoops in one ice cream tub. Used to convert scoop counts to tubs.
 SCOOPS_PER_TUB = 60
 PORK_SCOOPS_PER_BAG = 6
 CHILI_SCOOPS_PER_CAN = 30
@@ -557,7 +556,7 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
     Returns a dict: {item: qty}
 
     For Toft's ice cream items (auto-detected from TOFTS_ICE_CREAM):
-      qty = packages × SCOOPS_PER_TUB  (already converted to scoops)
+      qty = packages  (1 package = 1 tub)
 
     For fountain drink items:
       qty = packages × stand-specific bag size in ounces
@@ -639,7 +638,7 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         except (ValueError, IndexError):
             units_per = 1
 
-        # Auto-detect Toft's ice cream: convert tubs → scoops automatically.
+        # Auto-detect Toft's ice cream: keep deliveries in tubs.
         # All other items: multiply packages × units_per to get total units.
         is_tofts_ice_cream = any(
             item.lower() == tofts_item.lower()
@@ -658,10 +657,10 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         is_cheese = item.lower() == "cheese"
 
         if is_tofts_ice_cream:
-            qty = packages * SCOOPS_PER_TUB
+            qty = packages
             print(
                 f"  [Deliveries] '{item}': {packages} tub(s) → "
-                f"{qty} scoops"
+                f"{qty} tub(s)"
             )
         elif is_fountain_drink:
             bag_size_oz = SYRUP_BAG_SIZES.get(stand_name, 320)
@@ -2618,7 +2617,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
 
             row_values = [
                 item_data.get("starting", 0),        # Starting
-                item_data.get("deliveries", 0),      # Deliveries (scoops for ice cream, units otherwise)
+                item_data.get("deliveries", 0),      # Deliveries (tubs for ice cream, units otherwise)
                 item_data.get("sales", 0),               # Sales
                 item_data.get("spoilage", 0),            # Spoilage
                 expected_formula,                    # Expected (formula)
