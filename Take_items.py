@@ -114,6 +114,14 @@ _TOFTS_ICE_CREAM_SKIP_ITEMS: frozenset = frozenset({
 
 _NORMALIZED_MODIFIER_ITEMS = {normalize_item_name(name) for name in MODIFIER_ITEMS}
 
+# "2 for $1" multi-buy items: 1 Square unit sold = 2 physical pieces.
+# Each $1 transaction rings up as a single unit, but the customer receives
+# two physical items, so inventory must deduct 2 pieces per unit sold.
+UNITS_PER_SALE = {
+    "Airheads 2 for $1": 2,
+    "Cuties (2/$1.00)": 2,
+}
+
 _logger = _make_logger("concession.Take_items")
 
 
@@ -185,7 +193,7 @@ def take_items(csv_file_path, stand_name=None):
                 )
                 sold = refunded = 0
 
-            net_sales = sold - refunded
+            net_sales = (sold - refunded) * UNITS_PER_SALE.get(item, 1)
 
             if item == "":
                 skipped_rows += 1
