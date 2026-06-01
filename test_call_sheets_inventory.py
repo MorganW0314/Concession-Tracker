@@ -36,6 +36,47 @@ _install_google_stubs()
 import Call_sheets  # noqa: E402
 
 
+def _write_full_week_item_row(category_order, rows, target_item, stand_name="PTAC"):
+    fake_sheet = MagicMock()
+    fake_service = MagicMock()
+    fake_service.spreadsheets().values().batchUpdate().execute.return_value = {}
+    fake_service.spreadsheets().values().update().execute.return_value = {}
+    fake_service.spreadsheets().batchUpdate().execute.return_value = {}
+
+    item_row_map = {}
+    row_num = 3
+    for _category_name, item_list in category_order:
+        for item in sorted(item_list):
+            item_row_map[Call_sheets.normalize_item_name(item)] = row_num
+            row_num += 1
+
+    target_row_num = item_row_map[Call_sheets.normalize_item_name(target_item)]
+
+    with (
+        patch("Call_sheets.CATEGORY_ORDER", category_order, create=True),
+        patch.object(Call_sheets, "ensure_stand_sheet_exists", return_value=None),
+        patch.object(Call_sheets, "get_sheet_id", return_value=123),
+        patch.object(Call_sheets, "find_last_week_start_col", return_value=0),
+        patch.object(Call_sheets, "read_last_week_actuals_from_stand_sheet", return_value={}),
+        patch.object(Call_sheets, "read_spoilage", return_value={}),
+        patch.object(Call_sheets, "clear_spoilage_sheet", return_value=None),
+        patch.object(Call_sheets, "extract_week_dates_from_label", return_value=(None, None)),
+        patch.object(Call_sheets, "read_deliveries", return_value={}),
+        patch.object(Call_sheets, "read_item_row_map", return_value=item_row_map),
+        patch.object(Call_sheets, "_qty_per_case_value", return_value=1),
+        patch.object(Call_sheets, "_sync_master_items_tab", return_value=None),
+    ):
+        Call_sheets.write_full_week(fake_sheet, fake_service, "sid", stand_name, rows)
+
+    body = fake_service.spreadsheets.return_value.values.return_value.batchUpdate.call_args.kwargs["body"]
+    target_range = f"'{stand_name}'!B{target_row_num}:M{target_row_num}"
+    item_row = next(
+        (entry["values"][0] for entry in body["data"] if entry["range"] == target_range),
+        None,
+    )
+    return item_row, target_row_num
+
+
 class InventoryRefactorTests(unittest.TestCase):
     def test_tofts_base_flavors_updated(self):
         self.assertIn("Birthday Cake", Call_sheets._TOFTS_BASE_FLAVORS)
@@ -382,6 +423,53 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(item_row[4], "=B3+C3-M3-E3")
         self.assertAlmostEqual(item_row[0] + item_row[1] - item_row[11] - item_row[3], 3.92, places=2)
 
+    def test_disposable_and_janitorial_items_leave_variance_blank(self):
+        napkins_row, _ = _write_full_week_item_row(
+            [("DISPOSABLES", ["Napkins"])],
+            {"Napkins": {"sales": 4}},
+            "Napkins",
+        )
+        hand_soap_row, _ = _write_full_week_item_row(
+            [("JANITORIAL", ["Hand Soap"])],
+            {"Hand Soap": {"sales": 2}},
+            "Hand Soap",
+        )
+
+        self.assertEqual(napkins_row[Call_sheets.COL_VARIANCE], "")
+        self.assertEqual(hand_soap_row[Call_sheets.COL_VARIANCE], "")
+
+    def test_souvenir_cups_keeps_variance_formula(self):
+        item_row, row_num = _write_full_week_item_row(
+            [("DISPOSABLES", ["Souvenir Cups"])],
+            {"Souvenir Cups": {"sales": 17}},
+            "Souvenir Cups",
+        )
+
+        actual_col = Call_sheets.col_letter(1 + Call_sheets.COL_ACTUAL)
+        expected_col = Call_sheets.col_letter(1 + Call_sheets.COL_EXPECTED)
+        variance_formula = (
+            f'=IF({actual_col}{row_num}="",'
+            f'"",{actual_col}{row_num}-{expected_col}{row_num})'
+        )
+
+        self.assertEqual(item_row[Call_sheets.COL_VARIANCE], variance_formula)
+
+    def test_non_disposable_items_keep_variance_formula(self):
+        item_row, row_num = _write_full_week_item_row(
+            [("CANDY", ["Airheads 2 for $1"])],
+            {"Airheads 2 for $1": {"sales": 6}},
+            "Airheads 2 for $1",
+        )
+
+        actual_col = Call_sheets.col_letter(1 + Call_sheets.COL_ACTUAL)
+        expected_col = Call_sheets.col_letter(1 + Call_sheets.COL_EXPECTED)
+        variance_formula = (
+            f'=IF({actual_col}{row_num}="",'
+            f'"",{actual_col}{row_num}-{expected_col}{row_num})'
+        )
+
+        self.assertEqual(item_row[Call_sheets.COL_VARIANCE], variance_formula)
+
     def test_popcorn_location_restrictions(self):
         self.assertIn("Popcorn", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
         self.assertEqual(
@@ -429,6 +517,32 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(
             rows,
             {"Chocolate": {"sales": 2, "deliveries": 3, "spoilage": 1}},
+        )
+
+    def test_consolidate_variants_keeps_cotton_candy_candy_and_folds_scoops(self):
+        rows = {
+            "Cotton Candy": {"sales": 17, "deliveries": 0, "spoilage": 0},
+            "Cotton Candy Ice Cream": {"sales": 4, "deliveries": 0, "spoilage": 0},
+            "Cotton Candy Double Scoop": {"sales": 3, "deliveries": 1, "spoilage": 2},
+        }
+
+        Call_sheets.consolidate_variants_to_base(rows)
+
+        self.assertIn("Cotton Candy", rows)
+        self.assertEqual(rows["Cotton Candy"]["sales"], 17)
+        self.assertNotIn("Cotton Candy Double Scoop", rows)
+        self.assertEqual(rows["Cotton Candy Ice Cream"]["sales"], 7)
+        self.assertEqual(rows["Cotton Candy Ice Cream"]["deliveries"], 1)
+        self.assertEqual(rows["Cotton Candy Ice Cream"]["spoilage"], 2)
+
+    def test_consolidate_variants_does_not_remove_bare_cotton_candy_row(self):
+        rows = {"Cotton Candy": {"sales": 17, "deliveries": 0, "spoilage": 0}}
+
+        Call_sheets.consolidate_variants_to_base(rows)
+
+        self.assertEqual(
+            rows,
+            {"Cotton Candy": {"sales": 17, "deliveries": 0, "spoilage": 0}},
         )
 
     def test_get_default_category_order_for_stand_filters_location_items(self):
@@ -501,7 +615,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertTrue(Call_sheets._is_item_available_at_stand("Coke", "TREMONT"))
         self.assertTrue(Call_sheets._is_item_available_at_stand("Coke", "Bevelhymer Green"))
 
-    def test_read_deliveries_converts_fountain_packages_to_stand_oz(self):
+    def test_read_deliveries_converts_fountain_packages_to_bags(self):
         header = [["Date", "Item Name", "Packages", "Units per package"]]
         rows = [["05-10-2026", "Diet RC", "2", "1"]]
         tofts_rows = [["05-10-2026", "Brownie Bandit", "2", "999"]]
@@ -513,7 +627,7 @@ class InventoryRefactorTests(unittest.TestCase):
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
             ptac = Call_sheets.read_deliveries(object(), "sid", "PTAC")
-        self.assertEqual(ptac["Diet RC"], 1280)
+        self.assertEqual(ptac["Diet RC"], 2)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, tofts_rows]):
             tofts = Call_sheets.read_deliveries(object(), "sid", "PTAC")
@@ -521,15 +635,15 @@ class InventoryRefactorTests(unittest.TestCase):
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
             reed = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
-        self.assertEqual(reed["Diet RC"], 640)
+        self.assertEqual(reed["Diet RC"], 2)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, root_beer_rows]):
             ptac_root_beer = Call_sheets.read_deliveries(object(), "sid", "PTAC")
-        self.assertEqual(ptac_root_beer["Root Beer"], 640)
+        self.assertEqual(ptac_root_beer["Root Beer"], 1)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, root_beer_rows]):
             reed_root_beer = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
-        self.assertEqual(reed_root_beer["Root Beer"], 320)
+        self.assertEqual(reed_root_beer["Root Beer"], 1)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, popcorn_rows]):
             reed_popcorn = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")

@@ -366,78 +366,8 @@ def create_weekly_sheet(service, spreadsheet_id, stand_name):
     return new_title
 
 
-#For scoops in range(UNIT_CONVERSION)
-    
-UNIT_CONVERSION = {
-    # Vanilla
-    "Vanilla": 1,
-    "Vanilla Double Scoop": 2,
-    "Vanilla Triple Scoop": 3,
 
-    # Chocolate
-    "Chocolate": 1,
-    "Chocolate Double Scoop": 2,
-    "Chocolate Triple Scoop": 3,
 
-    # Cookies N Cream
-    "Cookies N Cream": 1,
-    "Cookies N Cream Double Scoop": 2,
-    "Cookies N Cream Triple Scoop": 3,
-
-    # Cookie Dough
-    "Cookie Dough": 1,
-    "Cookie Dough Double Scoop": 2,
-    "Cookie Dough Triple Scoop": 3,
-
-    # Cotton Candy Ice Cream (distinct from Cotton Candy candy)
-    "Cotton Candy Ice Cream": 1,
-    "Cotton Candy Ice Cream Double Scoop": 2,
-    "Cotton Candy Ice Cream Triple Scoop": 3,
-
-    # Cookie Monster
-    "Cookie Monster": 1,
-    "Cookie Monster Double Scoop": 2,
-    "Cookie Monster Triple Scoop": 3,
-
-    # Brownie Bandit
-    "Brownie Bandit": 1,
-    "Brownie Bandit Double Scoop": 2,
-    "Brownie Bandit Triple Scoop": 3,
-
-    # Birthday Cake
-    "Birthday Cake": 1,
-    "Birthday Cake Double Scoop": 2,
-    "Birthday Cake Triple Scoop": 3,
-
-    # Mint Chip
-    "Mint Chip": 1,
-    "Mint Chip Double Scoop": 2,
-    "Mint Chip Triple Scoop": 3,
-
-    # Rainbow Sherbet
-    "Rainbow Sherbet": 1,
-    "Rainbow Sherbet Double Scoop": 2,
-    "Rainbow Sherbet Triple Scoop": 3,
-    # Backward-compatible CSV spelling
-    "Rainbow Sherbert": 1,
-    "Rainbow Sherbert Double Scoop": 2,
-    "Rainbow Sherbert Triple Scoop": 3,
-
-    # PB S'Mores
-    "PB S'Mores": 1,
-    "PB S'Mores Double Scoop": 2,
-    "PB S'Mores Triple Scoop": 3,
-
-    # Blueberry Waffle Cone
-    "Blueberry Waffle Cone": 1,
-    "Blueberry Waffle Cone Double Scoop": 2,
-    "Blueberry Waffle Cone Triple Scoop": 3,
-
-    # Airheads (non-ice cream)
-    "Airheads 2 for $1": 2,
-    # Cuties — sold 2 for $1; each transaction counts as 2 units
-    "Cuties (2/$1.00)": 2,
-}
 def normalize_flavor(item):
     """Normalize only the flavor portion of an ice cream scoop item."""
     item = item.lower().strip()
@@ -663,11 +593,10 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
                 f"{qty} tub(s)"
             )
         elif is_fountain_drink:
-            bag_size_oz = SYRUP_BAG_SIZES.get(stand_name, 320)
-            qty = packages * bag_size_oz
+            qty = packages
             print(
-                f"  [Deliveries] '{item}': {packages} bag(s) at "
-                f"{stand_name} → {qty} oz syrup"
+                f"  [Deliveries] '{item}': {packages} bag(s) → "
+                f"{qty} bag(s)"
             )
         elif is_popcorn:
             qty = packages * POPCORN_PACKETS_PER_BOX
@@ -1349,13 +1278,15 @@ _TOFTS_BASE_FLAVORS = [
 # folds it into the correct base-flavor bucket.  Omitting a variant here
 # causes its sales/deliveries/spoilage to be silently dropped.
 #
-# This dict serves two purposes:
+# This dict serves the modifier / scoop-counting pipeline:
 #   1. group_scoops_by_flavor() – resolves variant name → base before counting
 #      scoops (handles names that don't auto-normalize, e.g. "Cotton Candy
 #      Double Scoop" → "cotton candy" ≠ "cotton candy ice cream").
-#   2. consolidate_variants_to_base() – merges ALL numeric row data
-#      (sales, deliveries, spoilage) from variant keys into base-flavor keys
-#      so the sheet's Sales column is populated correctly.
+#   2. merge_modifier_rows() – rolls modifier-sales flavor entries into the
+#      canonical base-flavor rows used by the sheet.
+#
+# Keep the bare "Cotton Candy" → "Cotton Candy Ice Cream" alias here because
+# modifier-sales exports can use the bare flavor name for genuine ice cream.
 SCOOP_VARIANT_TO_BASE: dict[str, str] = {
     # Brownie Bandit
     "Brownie Bandit":                     "Brownie Bandit",
@@ -1438,6 +1369,16 @@ SCOOP_VARIANT_TO_BASE: dict[str, str] = {
     "Vanilla Triple Scoop":               "Vanilla",
 }
 
+# Row consolidation runs on the main item-sales rows, where a bare
+# "Cotton Candy" row is the Candy item and must remain distinct. Keep the
+# modifier/scoop aliases above, but exclude this one ambiguous bare-name alias
+# from the map that consolidate_variants_to_base() iterates.
+CONSOLIDATE_VARIANT_TO_BASE: dict[str, str] = {
+    variant: base
+    for variant, base in SCOOP_VARIANT_TO_BASE.items()
+    if variant != "Cotton Candy"
+}
+
 
 def consolidate_variants_to_base(
     rows: dict,
@@ -1476,13 +1417,13 @@ def consolidate_variants_to_base(
                      Each data_dict may contain "sales", "deliveries",
                      "spoilage", "starting", and other numeric fields.
         variant_map: Mapping of variant_name -> base_name.  Defaults to
-                     SCOOP_VARIANT_TO_BASE.  Override only in tests.
+                     CONSOLIDATE_VARIANT_TO_BASE.  Override only in tests.
 
     Returns:
         The same ``rows`` dict (mutated in-place) for convenient chaining.
     """
     if variant_map is None:
-        variant_map = SCOOP_VARIANT_TO_BASE
+        variant_map = CONSOLIDATE_VARIANT_TO_BASE
 
     for variant, base in variant_map.items():
         if variant not in rows:
@@ -1734,11 +1675,6 @@ DISPOSABLES = [
     "Popcorn Boxes",
 ]
 
-
-
-
-
-
 JANITORIAL = [
     "Dish Soap(estimate)",
     "Floor Cleaner(estimate)",
@@ -1792,6 +1728,9 @@ JANITORIAL = [
 
 
 ]
+
+KEEP_VARIANCE_FOR_ITEMS = {"Souvenir Cups"}
+VARIANCE_DISABLED_ITEMS = (set(DISPOSABLES) | set(JANITORIAL)) - KEEP_VARIANCE_FOR_ITEMS
 
 QUANTITY_PER_CASE = {
     # CANDY
@@ -2019,8 +1958,8 @@ INGREDIENTS = [
 # The sold item's own row is left unchanged; only the listed ingredients
 # are added to (accumulated in) the rows dict.
 #
-# Ice cream scoop items are handled separately via group_scoops_by_flavor /
-# UNIT_CONVERSION and do NOT need entries here.
+# Ice cream scoop items are handled separately via group_scoops_by_flavor and
+# do NOT need entries here.
 # ---------------------------------------------------------------------------
 INGREDIENT_MAP = {
     # Sandwiches and proteins
@@ -2614,6 +2553,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
                 f'=IF({ac_col}{row_num}="",'
                 f'"",{ac_col}{row_num}-{ex_col}{row_num})'
             )
+            variance_value = "" if item in VARIANCE_DISABLED_ITEMS else variance_formula
 
             row_values = [
                 item_data.get("starting", 0),        # Starting
@@ -2625,7 +2565,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
                 "",                                  # Cases/Packs   (employee fills in)
                 _qty_per_case_value(item, stand_name, category_name),  # Qty Per Case
                 actual_formula,                      # Actual = Ind + Cases×Qty
-                variance_formula,                    # Variance = Actual − Expected
+                variance_value,                      # Variance = Actual − Expected
                 item_data.get("scoops_used", 0) if is_tofts else "",  # Scoops Used
                 item_data.get("tubs_used", 0)   if is_tofts else "",  # Tubs Used
             ]

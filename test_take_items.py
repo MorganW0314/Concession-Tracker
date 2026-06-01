@@ -273,6 +273,19 @@ class TakeItemsSkipTests(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_souvenir_cup_alias_maps_sales_to_souvenir_cups(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Souvenir Cup", "Item Variation": "Regular",
+             "Units Sold": "17", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertIn("Souvenir Cups", result)
+            self.assertNotIn("Souvenir Cup", result)
+            self.assertEqual(result["Souvenir Cups"]["sales"], 17)
+        finally:
+            os.unlink(path)
+
     def test_slushie_and_crunchy_base_items_are_skipped(self):
         path = _write_tmp_csv([
             {"Item Name": "Slushie", "Item Variation": "Regular", "Units Sold": "4", "Units Refunded": "0"},
@@ -807,6 +820,59 @@ class NewItemsInventoryTests(unittest.TestCase):
                 self.BEVELHYMER,
                 f"{item!r} should be restricted to Bevelhymer stands only",
             )
+
+
+class MultiByItemTests(unittest.TestCase):
+    """Verify that "2 for $1" multi-buy items deduct 2 physical pieces per unit sold."""
+
+    def test_airheads_doubles_units_sold(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Airheads 2 for $1", "Item Variation": "Regular",
+             "Units Sold": "5", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertIn("Airheads 2 for $1", result)
+            self.assertEqual(result["Airheads 2 for $1"]["sales"], 10)
+        finally:
+            os.unlink(path)
+
+    def test_cuties_doubles_units_sold(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Cuties (2/$1.00)", "Item Variation": "Regular",
+             "Units Sold": "3", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertIn("Cuties (2/$1.00)", result)
+            self.assertEqual(result["Cuties (2/$1.00)"]["sales"], 6)
+        finally:
+            os.unlink(path)
+
+    def test_airheads_refund_scales_with_multiplier(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Airheads 2 for $1", "Item Variation": "Regular",
+             "Units Sold": "5", "Units Refunded": "1"},
+        ])
+        try:
+            result = take_items(path)
+            # net = (5 - 1) * 2 = 8
+            self.assertIn("Airheads 2 for $1", result)
+            self.assertEqual(result["Airheads 2 for $1"]["sales"], 8)
+        finally:
+            os.unlink(path)
+
+    def test_control_item_not_doubled(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Sour Patch Kids", "Item Variation": "Regular",
+             "Units Sold": "7", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertIn("Sour Patch Kids", result)
+            self.assertEqual(result["Sour Patch Kids"]["sales"], 7)
+        finally:
+            os.unlink(path)
 
 
 if __name__ == "__main__":
