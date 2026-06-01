@@ -2585,15 +2585,15 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
 
             # Spreadsheet formulas (use USER_ENTERED so Sheets evaluates them).
             # Deliveries are already converted to the correct unit:
-            #   Toft's ice cream → scoops (packages × 60 done in read_deliveries)
+            #   Toft's ice cream → tubs (scoops ÷ 60 stored in tubs_used)
             #   All other items  → units  (packages × units_per)
             # So Expected uses the same structure for every item:
-            #   Toft's:    Starting + Deliveries - ScoopsUsed - Spoilage
+            #   Toft's:    Starting + Deliveries - TubsUsed - Spoilage
             #   Non-Toft's: Starting + Deliveries - Sales - Spoilage
             if is_tofts:
                 expected_formula = (
                     f"={s_col}{row_num}+{d_col}{row_num}"
-                    f"-{sc_col}{row_num}-{sp_col}{row_num}"
+                    f"-{tu_col}{row_num}-{sp_col}{row_num}"
                 )
             else:
                 expected_formula = (

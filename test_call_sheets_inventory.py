@@ -264,6 +264,79 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(rows["Vanilla"]["scoops_used"], 30)
         self.assertEqual(rows["Vanilla"]["tubs_used"], 0.5)
 
+    def test_tofts_expected_formula_uses_tubs_used_not_scoops_used(self):
+        """Expected formula for Toft's ice cream must subtract Tubs Used (tu_col),
+        not Scoops Used (sc_col), so units are consistent (tubs ± tubs)."""
+        def _row(starting=0, scoops_used=0, tubs_used=0):
+            return {
+                "sales": 0,
+                "starting": starting,
+                "deliveries": 0,
+                "spoilage": 0,
+                "expected": 0,
+                "actual": "",
+                "variance": "",
+                "scoops_used": scoops_used,
+                "tubs_used": tubs_used,
+            }
+
+        rows = {
+            "Brownie Bandit": _row(starting=1.9, scoops_used=17, tubs_used=0.28),
+        }
+
+        fake_sheet = MagicMock()
+        fake_service = MagicMock()
+        fake_service.spreadsheets().values().batchUpdate().execute.return_value = {}
+        fake_service.spreadsheets().values().update().execute.return_value = {}
+        fake_service.spreadsheets().batchUpdate().execute.return_value = {}
+
+        with (
+            patch("Call_sheets.CATEGORY_ORDER", [("ICE_CREAM_TOFTS", ["Brownie Bandit"])], create=True),
+            patch.object(Call_sheets, "ensure_stand_sheet_exists", return_value=None),
+            patch.object(Call_sheets, "get_sheet_id", return_value=123),
+            patch.object(Call_sheets, "find_last_week_start_col", return_value=0),
+            patch.object(Call_sheets, "read_last_week_actuals_from_stand_sheet", return_value={}),
+            patch.object(Call_sheets, "read_spoilage", return_value={}),
+            patch.object(Call_sheets, "clear_spoilage_sheet", return_value=None),
+            patch.object(Call_sheets, "extract_week_dates_from_label", return_value=(None, None)),
+            patch.object(Call_sheets, "read_deliveries", return_value={}),
+            patch.object(Call_sheets, "read_item_row_map", return_value={"brownie bandit": 3}),
+            patch.object(Call_sheets, "_qty_per_case_value", return_value=1),
+            patch.object(Call_sheets, "_sync_master_items_tab", return_value=None),
+        ):
+            Call_sheets.write_full_week(fake_sheet, fake_service, "sid", "PTAC", rows)
+
+        # Capture the batchUpdate body written for item rows.
+        body = fake_service.spreadsheets.return_value.values.return_value.batchUpdate.call_args.kwargs["body"]
+        all_written_values = [v for item in body["data"] for v in item["values"]]
+
+        # The Expected formula is at index 4 in the row values list.
+        # With find_last_week_start_col=0 → next_week_start=1:
+        #   s_col  = col_letter(1+0)  = "B"
+        #   d_col  = col_letter(1+1)  = "C"
+        #   sp_col = col_letter(1+3)  = "E"
+        #   sc_col = col_letter(1+10) = "L"
+        #   tu_col = col_letter(1+11) = "M"
+        # Row 3 → Expected formula should be =B3+C3-M3-E3 (tubs), not =B3+C3-L3-E3 (scoops).
+        expected_formulas = [row[4] for row in all_written_values if len(row) > 4]
+        self.assertTrue(
+            expected_formulas,
+            "No Expected formula was written for the ice cream row",
+        )
+        for formula in expected_formulas:
+            tu_col = Call_sheets.col_letter(1 + Call_sheets.COL_TUBS)
+            sc_col = Call_sheets.col_letter(1 + Call_sheets.COL_SCOOPS)
+            self.assertIn(
+                f"-{tu_col}3",
+                formula,
+                f"Expected formula should subtract Tubs Used ({tu_col}3) but got: {formula}",
+            )
+            self.assertNotIn(
+                f"-{sc_col}3",
+                formula,
+                f"Expected formula must NOT subtract Scoops Used ({sc_col}3) but got: {formula}",
+            )
+
     def test_popcorn_location_restrictions(self):
         self.assertIn("Popcorn", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
         self.assertEqual(
