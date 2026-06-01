@@ -108,6 +108,7 @@ _TOFTS_ICE_CREAM_SKIP_ITEMS: frozenset = frozenset({
     "Rainbow Sherbert", "Rainbow Sherbert Single Scoop", "Rainbow Sherbert Double Scoop", "Rainbow Sherbert Triple Scoop",
     "PB S'Mores Single Scoop", "PB S'Mores Double Scoop", "PB S'Mores Triple Scoop",
     "Blueberry Waffle Cone Single Scoop", "Blueberry Waffle Cone Double Scoop", "Blueberry Waffle Cone Triple Scoop",
+    "Blueberry Waffle Cone Cone",
     "Vanilla Single Scoop", "Vanilla Double Scoop", "Vanilla Triple Scoop",
 })
 
