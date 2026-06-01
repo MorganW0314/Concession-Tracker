@@ -190,7 +190,7 @@ class InventoryRefactorTests(unittest.TestCase):
 
         self.assertEqual(actuals["Vanilla"], 1.95)
         self.assertEqual(actuals["Hot Dog"], 48.0)
-        self.assertEqual(actuals["PB S'Mores"], 1.88)
+        self.assertEqual(actuals["PB S'Mores"], round(1.875, 2))
         self.assertEqual(actuals["Nacho Cheese"], 0)
 
     def test_modifier_ice_cream_sales_drive_scoops_and_tubs_with_alias_rollups(self):
