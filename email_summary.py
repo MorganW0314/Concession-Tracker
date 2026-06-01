@@ -79,10 +79,7 @@ def _read_latest_week_rows(sheet, spreadsheet_id: str, stand_name: str) -> List[
         actual = _to_number(row[actual_idx]) if len(row) > actual_idx else None
         individuals_raw = row[individuals_idx] if len(row) > individuals_idx else ""
         cases_raw = row[cases_idx] if len(row) > cases_idx else ""
-        counted = bool(
-            (individuals_raw is not None and individuals_raw != "")
-            or (cases_raw is not None and cases_raw != "")
-        )
+        counted = bool(individuals_raw or cases_raw)
         parsed.append(
             {
                 "item": item,
