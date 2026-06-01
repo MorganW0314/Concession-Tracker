@@ -1734,11 +1734,6 @@ DISPOSABLES = [
     "Popcorn Boxes",
 ]
 
-
-
-
-
-
 JANITORIAL = [
     "Dish Soap(estimate)",
     "Floor Cleaner(estimate)",
@@ -1792,6 +1787,9 @@ JANITORIAL = [
 
 
 ]
+
+VARIANCE_ENABLED_EXCEPTIONS = {"Souvenir Cups"}
+VARIANCE_DISABLED_ITEMS = (set(DISPOSABLES) | set(JANITORIAL)) - VARIANCE_ENABLED_EXCEPTIONS
 
 QUANTITY_PER_CASE = {
     # CANDY
@@ -2614,6 +2612,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
                 f'=IF({ac_col}{row_num}="",'
                 f'"",{ac_col}{row_num}-{ex_col}{row_num})'
             )
+            variance_value = "" if item in VARIANCE_DISABLED_ITEMS else variance_formula
 
             row_values = [
                 item_data.get("starting", 0),        # Starting
@@ -2625,7 +2624,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
                 "",                                  # Cases/Packs   (employee fills in)
                 _qty_per_case_value(item, stand_name, category_name),  # Qty Per Case
                 actual_formula,                      # Actual = Ind + Cases×Qty
-                variance_formula,                    # Variance = Actual − Expected
+                variance_value,                      # Variance = Actual − Expected
                 item_data.get("scoops_used", 0) if is_tofts else "",  # Scoops Used
                 item_data.get("tubs_used", 0)   if is_tofts else "",  # Tubs Used
             ]

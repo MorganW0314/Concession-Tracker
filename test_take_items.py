@@ -273,6 +273,19 @@ class TakeItemsSkipTests(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_souvenir_cup_alias_maps_sales_to_souvenir_cups(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Souvenir Cup", "Item Variation": "Regular",
+             "Units Sold": "17", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertIn("Souvenir Cups", result)
+            self.assertNotIn("Souvenir Cup", result)
+            self.assertEqual(result["Souvenir Cups"]["sales"], 17)
+        finally:
+            os.unlink(path)
+
     def test_slushie_and_crunchy_base_items_are_skipped(self):
         path = _write_tmp_csv([
             {"Item Name": "Slushie", "Item Variation": "Regular", "Units Sold": "4", "Units Refunded": "0"},

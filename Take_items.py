@@ -3,7 +3,7 @@ import logging
 import os
 
 from data_validation import AuditLogger, _make_logger
-from item_name_utils import normalize_item_name
+from item_name_utils import canonicalize_item_name, normalize_item_name
 
 COMBO_BREAKDOWN = {
     "Chili Cheese Dog Combo Meal": ["Chili Cheese Dog", "Assorted Chips"],
@@ -233,15 +233,17 @@ def take_items(csv_file_path, stand_name=None):
                 )
                 continue  # skip adding the combo itself
 
-            if item not in rows:
-                rows[item] = {
+            canonical_item = canonicalize_item_name(item)
+
+            if canonical_item not in rows:
+                rows[canonical_item] = {
                     "starting": 0,
                     "deliveries": 0,
                     "sales": 0,
                     "spoilage": 0,
                 }
 
-            rows[item]["sales"] += net_sales
+            rows[canonical_item]["sales"] += net_sales
 
     _logger.info(
         "CSV read complete: %d raw rows, %d items loaded, "
