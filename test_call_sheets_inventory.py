@@ -65,6 +65,12 @@ class InventoryRefactorTests(unittest.TestCase):
             [("Vanilla", 1)],
         )
 
+    def test_ingredient_map_cup_of_cheese_uses_one_nacho_serving(self):
+        self.assertEqual(
+            Call_sheets.INGREDIENT_MAP["Cup of Cheese"],
+            [("Nacho Cheese", 3)],
+        )
+
     def test_ingredient_map_tracks_chili_and_pulled_pork_scoops(self):
         self.assertEqual(
             Call_sheets.INGREDIENT_MAP["Walking Taco"],
@@ -161,6 +167,35 @@ class InventoryRefactorTests(unittest.TestCase):
         result = Call_sheets.calculate_ingredients_per_stand(rows)
         self.assertEqual(result["Ham"]["sales"], 1.0)
         self.assertEqual(result["Cheese"]["sales"], 0.2)
+
+    def test_calculate_ingredients_per_stand_converts_cup_of_cheese_to_nacho_bags(self):
+        rows = {"Cup of Cheese": {"sales": 87}}
+        result = Call_sheets.calculate_ingredients_per_stand(rows)
+        self.assertEqual(result["Nacho Cheese"]["sales"], 1.86)
+
+    def test_modifier_ice_cream_sales_drive_scoops_and_tubs_with_alias_rollups(self):
+        # Modifier quantities already represent scoop counts (including Double/Triple dips).
+        rows = {"Double Dip": {"sales": 86}, "Cotton Candy": {"sales": 9}}
+        modifier_rows = {
+            "Vanilla": {"sales": 54},
+            "Cookies n' Cream": {"sales": 42},
+            "Rainbow Sherbert": {"sales": 6},
+            "Cotton Candy": {"sales": 2},
+        }
+        Call_sheets.merge_modifier_rows(rows, modifier_rows)
+
+        flavor_totals = Call_sheets.group_scoops_by_flavor(rows)
+        tubs_used = Call_sheets.tubs_used_from_scoops(flavor_totals)
+
+        self.assertEqual(flavor_totals["vanilla"], 54)
+        self.assertEqual(flavor_totals["cookies n' cream"], 42)
+        self.assertEqual(flavor_totals["rainbow sherbet"], 6)
+        self.assertEqual(flavor_totals["cotton candy ice cream"], 2)
+        self.assertEqual(rows["Cotton Candy"]["sales"], 9)
+        self.assertEqual(tubs_used["vanilla"], 0.9)
+        self.assertEqual(tubs_used["cookies n' cream"], 0.7)
+        self.assertEqual(tubs_used["rainbow sherbet"], 0.1)
+        self.assertEqual(tubs_used["cotton candy ice cream"], 0.03)
 
     def test_popcorn_location_restrictions(self):
         self.assertIn("Popcorn", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)

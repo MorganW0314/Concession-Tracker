@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import ttk, font as tkfont
 
 from Take_items import take_items, take_modifiers   # your CSV ingestion functions
-from Call_sheets import write_full_week, write_modifier_sales_to_week, sync_stand_item_list
+from Call_sheets import write_full_week, sync_stand_item_list, merge_modifier_rows
 from email_summary import send_summary_email
 from googleapiclient.discovery import build # type: ignore
 from google.oauth2.service_account import Credentials
@@ -341,10 +341,6 @@ class ConcessionApp(tk.Tk):
             self._log(f"Reading {os.path.basename(csv_file)}…")
             rows = take_items(csv_file)
 
-            # Write item sales to a new week block
-            self._log("Writing formatted sheet…")
-            write_full_week(sheet, service, SPREADSHEET_ID, stand_name, rows)
-
             # Check for a modifier file in the same folder as the item-sales CSV.
             # Any file matching modifier-sales-*.csv in that folder is accepted;
             # if multiple are found the most-recently modified one is used.
@@ -359,13 +355,14 @@ class ConcessionApp(tk.Tk):
                     week_end_date=None,
                     stand_name=stand_name,
                 )
-                self._log("Writing modifier sales to existing week columns")
-                write_modifier_sales_to_week(
-                    sheet, service, SPREADSHEET_ID, stand_name, modifier_rows,
-                )
-                self._log(f"Modifier sales written for {len(modifier_rows)} items.")
+                merge_modifier_rows(rows, modifier_rows)
+                self._log(f"Merged modifier sales for {len(modifier_rows)} items.")
             else:
                 self._log("No modifier-sales-*.csv file found in same folder — skipping modifier step.")
+
+            # Write merged item + modifier sales to a new week block
+            self._log("Writing formatted sheet…")
+            write_full_week(sheet, service, SPREADSHEET_ID, stand_name, rows)
 
             # Success
             self.after(0, self._on_success, stand_name)

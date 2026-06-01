@@ -877,6 +877,35 @@ def map_item_to_ingredients(item_name, quantity, ingredient_map=None):
     return result
 
 
+def merge_modifier_rows(rows, modifier_rows):
+    """Merge modifier-sales rows into the main rows dict in-place.
+
+    Ice cream flavor modifiers are normalized to canonical base-flavor keys via
+    SCOOP_VARIANT_TO_BASE so values like "Rainbow Sherbert" and "Cotton Candy"
+    roll up into the sheet's canonical Toft's rows.
+    """
+    for item_name, modifier_data in modifier_rows.items():
+        canonical_item = SCOOP_VARIANT_TO_BASE.get(item_name, item_name)
+        sales = modifier_data.get("sales", 0)
+        if not isinstance(sales, (int, float)):
+            logging.getLogger(__name__).warning(
+                "Skipping modifier row %r with non-numeric sales value %r",
+                item_name,
+                sales,
+            )
+            continue
+
+        if canonical_item not in rows:
+            rows[canonical_item] = {
+                "starting": 0, "deliveries": 0, "sales": 0,
+                "spoilage": 0, "scoops_used": 0, "tubs_used": 0,
+                "expected": 0, "actual": "",
+            }
+        rows[canonical_item]["sales"] = rows[canonical_item].get("sales", 0) + sales
+
+    return rows
+
+
 def calculate_ingredients_per_stand(rows, ingredient_map=None, stand_name=None):
     """Expand CSV sales into ingredient-level usage for a single stand.
 
@@ -1360,6 +1389,7 @@ SCOOP_VARIANT_TO_BASE: dict[str, str] = {
     "Cookies & Cream Double Scoop":       "Cookies n' Cream",
     "Cookies & Cream Triple Scoop":       "Cookies n' Cream",
     # Cotton Candy (base name differs: "Cotton Candy Ice Cream")
+    "Cotton Candy":                       "Cotton Candy Ice Cream",
     "Cotton Candy Ice Cream":             "Cotton Candy Ice Cream",
     "Cotton Candy Single Scoop":          "Cotton Candy Ice Cream",
     "Cotton Candy Double Scoop":          "Cotton Candy Ice Cream",
@@ -1997,6 +2027,7 @@ INGREDIENT_MAP = {
 
     # Nacho items (nacho cheese quantities are ounces per sale; 3oz each)
     "Nachos & Cheese": [("Nacho Chips", 1), ("Nacho Cheese", 3)],
+    "Cup of Cheese": [("Nacho Cheese", 3)],
     "Chili Cheese Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 3), ("Chili Sauce (cans)", 3)],
     "Pulled Pork Nachos": [("Nacho Chips", 1), ("Nacho Cheese", 3), ("Pulled Pork (bags)", 1)],
     "Walking Taco": [("Assorted Chips", 1), ("Chili Sauce (cans)", 2)],
