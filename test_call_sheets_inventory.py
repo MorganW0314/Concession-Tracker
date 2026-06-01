@@ -162,16 +162,36 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(Call_sheets.HAM_SLICES_PER_PACKAGE, 32)
         self.assertEqual(Call_sheets.CHEESE_SLICES_PER_PACKAGE, 160)
 
-    def test_calculate_ingredients_per_stand_converts_ham_and_cheese_to_packages(self):
+    def test_calculate_ingredients_per_stand_keeps_ham_and_cheese_in_slices(self):
         rows = {"Ham and Cheese Sandwich": {"sales": 32}}
         result = Call_sheets.calculate_ingredients_per_stand(rows)
-        self.assertEqual(result["Ham"]["sales"], 1.0)
-        self.assertEqual(result["Cheese"]["sales"], 0.2)
+        self.assertEqual(result["Ham"]["sales"], 32)
+        self.assertEqual(result["Cheese"]["sales"], 32)
 
     def test_calculate_ingredients_per_stand_converts_cup_of_cheese_to_nacho_bags(self):
         rows = {"Cup of Cheese": {"sales": 87}}
         result = Call_sheets.calculate_ingredients_per_stand(rows)
         self.assertEqual(result["Nacho Cheese"]["sales"], 1.86)
+
+    def test_read_last_week_actuals_preserves_fractional_values(self):
+        sheet = MagicMock()
+        sheet.values().get().execute.return_value = {"values": [["1.95"], ["48"], ["1.875"], ["bad"]]}
+
+        with patch.object(
+            Call_sheets,
+            "read_item_row_map",
+            return_value={"Vanilla": 1, "Hot Dog": 2, "PB S'Mores": 3, "Nacho Cheese": 4},
+        ), patch.object(
+            Call_sheets,
+            "find_last_week_start_col",
+            return_value=2,
+        ):
+            actuals = Call_sheets.read_last_week_actuals_from_stand_sheet(sheet, "sid", "PTAC")
+
+        self.assertEqual(actuals["Vanilla"], 1.95)
+        self.assertEqual(actuals["Hot Dog"], 48.0)
+        self.assertEqual(actuals["PB S'Mores"], 1.88)
+        self.assertEqual(actuals["Nacho Cheese"], 0)
 
     def test_modifier_ice_cream_sales_drive_scoops_and_tubs_with_alias_rollups(self):
         # Modifier quantities already represent scoop counts (including Double/Triple dips).
@@ -196,6 +216,53 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertEqual(tubs_used["cookies n' cream"], 0.7)
         self.assertEqual(tubs_used["rainbow sherbet"], 0.1)
         self.assertEqual(tubs_used["cotton candy ice cream"], 0.03)
+
+    def test_blueberry_waffle_cone_alias_populates_scoops_and_tubs_on_base_row(self):
+        def _row(sales=0):
+            return {
+                "sales": sales,
+                "starting": 0,
+                "deliveries": 0,
+                "spoilage": 0,
+                "expected": 0,
+                "actual": "",
+                "variance": "",
+                "scoops_used": 0,
+                "tubs_used": 0,
+            }
+
+        rows = {
+            "Blueberry Waffle Cone": _row(0),
+            "Blueberry Waffle Cone Cone": _row(60),
+            "Vanilla": _row(30),
+        }
+
+        fake_sheet = MagicMock()
+        fake_service = MagicMock()
+        fake_service.spreadsheets().values().batchUpdate().execute.return_value = {}
+        fake_service.spreadsheets().values().update().execute.return_value = {}
+        fake_service.spreadsheets().batchUpdate().execute.return_value = {}
+
+        with (
+            patch("Call_sheets.CATEGORY_ORDER", [("ICE_CREAM_TOFTS", ["Blueberry Waffle Cone", "Vanilla"])], create=True),
+            patch.object(Call_sheets, "ensure_stand_sheet_exists", return_value=None),
+            patch.object(Call_sheets, "get_sheet_id", return_value=123),
+            patch.object(Call_sheets, "find_last_week_start_col", return_value=0),
+            patch.object(Call_sheets, "read_last_week_actuals_from_stand_sheet", return_value={}),
+            patch.object(Call_sheets, "read_spoilage", return_value={}),
+            patch.object(Call_sheets, "clear_spoilage_sheet", return_value=None),
+            patch.object(Call_sheets, "extract_week_dates_from_label", return_value=(None, None)),
+            patch.object(Call_sheets, "read_deliveries", return_value={}),
+            patch.object(Call_sheets, "read_item_row_map", return_value={"Blueberry Waffle Cone": 3, "Vanilla": 4}),
+            patch.object(Call_sheets, "_qty_per_case_value", return_value=1),
+            patch.object(Call_sheets, "_sync_master_items_tab", return_value=None),
+        ):
+            Call_sheets.write_full_week(fake_sheet, fake_service, "sid", "PTAC", rows)
+
+        self.assertEqual(rows["Blueberry Waffle Cone"]["scoops_used"], 60)
+        self.assertEqual(rows["Blueberry Waffle Cone"]["tubs_used"], 1.0)
+        self.assertEqual(rows["Vanilla"]["scoops_used"], 30)
+        self.assertEqual(rows["Vanilla"]["tubs_used"], 0.5)
 
     def test_popcorn_location_restrictions(self):
         self.assertIn("Popcorn", Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS)
@@ -352,6 +419,17 @@ class InventoryRefactorTests(unittest.TestCase):
         with patch.object(Call_sheets, "get_values", side_effect=[header, hot_dog_rows]):
             reed_hot_dogs = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_hot_dogs["Hot Dogs"], 1998)
+
+        ham_rows = [["05-10-2026", "Ham", "2", ignored_units_per_package]]
+        cheese_rows = [["05-10-2026", "Cheese", "1", ignored_units_per_package]]
+
+        with patch.object(Call_sheets, "get_values", side_effect=[header, ham_rows]):
+            reed_ham = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
+        self.assertEqual(reed_ham["Ham"], 2 * Call_sheets.HAM_SLICES_PER_PACKAGE)
+
+        with patch.object(Call_sheets, "get_values", side_effect=[header, cheese_rows]):
+            reed_cheese = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
+        self.assertEqual(reed_cheese["Cheese"], Call_sheets.CHEESE_SLICES_PER_PACKAGE)
 
     def test_qty_per_case_value_for_root_beer_uses_physical_bag_units(self):
         self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "PTAC"), 1)

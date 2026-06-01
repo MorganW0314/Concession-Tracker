@@ -217,7 +217,7 @@ def read_last_week_actuals_from_stand_sheet(sheet, spreadsheet_id, sheet_name):
             cell = actual_col_values[idx]
             if cell and cell[0]:
                 try:
-                    actuals[item] = int(float(cell[0]))
+                    actuals[item] = round(float(cell[0]), 2)
                 except (ValueError, TypeError):
                     actuals[item] = 0
     return actuals
@@ -654,6 +654,8 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         is_granola_bar = item.lower() == "granola bar"
         is_nacho_cheese = item.lower() == "nacho cheese"
         is_chicken_salad = item.lower() == "chicken salad"
+        is_ham = item.lower() == "ham"
+        is_cheese = item.lower() == "cheese"
 
         if is_tofts_ice_cream:
             qty = packages * SCOOPS_PER_TUB
@@ -680,6 +682,12 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
         elif is_chicken_salad:
             qty = packages * CHICKEN_SALAD_SCOOPS_PER_TUB
             print(f"  [Deliveries] '{item}': {packages} tub(s) → {qty} scoops chicken salad")
+        elif is_ham:
+            qty = packages * HAM_SLICES_PER_PACKAGE
+            print(f"  [Deliveries] '{item}': {packages} package(s) → {qty} slices")
+        elif is_cheese:
+            qty = packages * CHEESE_SLICES_PER_PACKAGE
+            print(f"  [Deliveries] '{item}': {packages} package(s) → {qty} slices")
         else:
             qty = packages * units_per
 
@@ -957,11 +965,11 @@ def calculate_ingredients_per_stand(rows, ingredient_map=None, stand_name=None):
     if "Ham" in rows:
         slices_used = rows["Ham"].get("sales", 0)
         if slices_used > 0:
-            rows["Ham"]["sales"] = round(slices_used / HAM_SLICES_PER_PACKAGE, 2)
+            rows["Ham"]["sales"] = slices_used
     if "Cheese" in rows:
         slices_used = rows["Cheese"].get("sales", 0)
         if slices_used > 0:
-            rows["Cheese"]["sales"] = round(slices_used / CHEESE_SLICES_PER_PACKAGE, 2)
+            rows["Cheese"]["sales"] = slices_used
 
     fountain_stand_name = stand_name or ""
 
@@ -1420,6 +1428,7 @@ SCOOP_VARIANT_TO_BASE: dict[str, str] = {
     "PB S'Mores Triple Scoop":            "PB S'Mores",
     # Blueberry Waffle Cone
     "Blueberry Waffle Cone":              "Blueberry Waffle Cone",
+    "Blueberry Waffle Cone Cone":         "Blueberry Waffle Cone",
     "Blueberry Waffle Cone Single Scoop": "Blueberry Waffle Cone",
     "Blueberry Waffle Cone Double Scoop": "Blueberry Waffle Cone",
     "Blueberry Waffle Cone Triple Scoop": "Blueberry Waffle Cone",
@@ -1561,6 +1570,7 @@ TOFTS_ICE_CREAM = [
     "Blueberry Waffle Cone Single Scoop",
     "Blueberry Waffle Cone Double Scoop",
     "Blueberry Waffle Cone Triple Scoop",
+    "Blueberry Waffle Cone Cone",
     "Vanilla Single Scoop",
     "Vanilla Double Scoop",
     "Vanilla Triple Scoop",
@@ -2234,12 +2244,12 @@ def read_last_week_inventory(service, spreadsheet_id, previous_sheet_name):
         actual = row[9] if len(row) > 9 and row[9] != "" else None
 
         try:
-            expected = int(float(expected)) if expected is not None else None
+            expected = round(float(expected), 2) if expected is not None else None
         except:
             expected = None
 
         try:
-            actual = int(float(actual)) if actual is not None else None
+            actual = round(float(actual), 2) if actual is not None else None
         except:
             actual = None
 
@@ -2397,15 +2407,18 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     # ============================
     # ICE CREAM SCOOP + TUBS LOGIC — assign computed values to base rows
     # ============================
+    base_flavor_by_norm = {normalize_flavor(flavor): flavor for flavor in _TOFTS_BASE_FLAVORS}
+    for variant_name, base_name in SCOOP_VARIANT_TO_BASE.items():
+        base_flavor_by_norm.setdefault(normalize_flavor(variant_name), base_name)
+
     for flavor, scoops in flavor_totals.items():
-        for tofts_flavor in TOFTS_ICE_CREAM:
-            # Only assign scoops_used / tubs_used to the canonical BASE flavor
-            # row.  Variant rows (Single Scoop, Double Scoop, etc.) inherit the
-            # Toft's expected formula but intentionally show scoops_used = 0 so
-            # they don't double-count against the base row's expected inventory.
-            if normalize_flavor(tofts_flavor) == flavor and tofts_flavor in _TOFTS_BASE_FLAVORS:
-                rows[tofts_flavor]["scoops_used"] = scoops
-                rows[tofts_flavor]["tubs_used"] = tubs_used_map.get(flavor, 0)
+        # Only assign scoops_used / tubs_used to canonical BASE flavor rows.
+        # Variant rows (Single Scoop, Double Scoop, etc.) intentionally keep
+        # scoops_used = 0 so they don't double-count inventory usage.
+        base_flavor = base_flavor_by_norm.get(flavor)
+        if base_flavor and base_flavor in rows:
+            rows[base_flavor]["scoops_used"] = scoops
+            rows[base_flavor]["tubs_used"] = tubs_used_map.get(flavor, 0)
 
     # ============================
     # FIND WHERE THE NEXT WEEK'S COLUMNS START
