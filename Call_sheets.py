@@ -663,11 +663,10 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
                 f"{qty} tub(s)"
             )
         elif is_fountain_drink:
-            bag_size_oz = SYRUP_BAG_SIZES.get(stand_name, 320)
-            qty = packages * bag_size_oz
+            qty = packages
             print(
-                f"  [Deliveries] '{item}': {packages} bag(s) at "
-                f"{stand_name} → {qty} oz syrup"
+                f"  [Deliveries] '{item}': {packages} bag(s) → "
+                f"{qty} bag(s)"
             )
         elif is_popcorn:
             qty = packages * POPCORN_PACKETS_PER_BOX
