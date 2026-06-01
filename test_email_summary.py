@@ -67,7 +67,7 @@ class EmailSummaryTests(unittest.TestCase):
         stand_rows = {
             "Stand A": [
                 {"item": "Vanilla", "sales": 2.0, "expected": 2.0, "actual": 0.5, "variance": -1.5},
-                {"item": "Pepsi", "sales": 64.0, "expected": 1280.0, "actual": 1280.0, "variance": 0.0},
+                {"item": "Pepsi", "sales": 4.0, "expected": 4.0, "actual": 4.0, "variance": 0.0},
                 {"item": "Hot Dog", "sales": 12.0, "expected": 24.0, "actual": 21.0, "variance": -3.0},
             ],
             "Stand B": [
@@ -83,9 +83,9 @@ class EmailSummaryTests(unittest.TestCase):
         self.assertIn("- Items with Negative Variance: 2", body)
         self.assertIn("Stand A", body)
         self.assertIn("ICE CREAM", body)
-        self.assertIn("Vanilla................. 2.00 tubs expected  ⚠️  Variance: -1.50", body)
+        self.assertIn("Vanilla................. 2.00 tubs expected  ⚠️  Variance: -1.50 tubs", body)
         self.assertIn("FOUNTAIN DRINKS", body)
-        self.assertIn("Pepsi................... 1280 oz expected", body)
+        self.assertIn("Pepsi................... 4 bags expected", body)
         self.assertIn("FOOD", body)
         self.assertIn("Hot Dog................. 24 expected  ⚠️  Variance: -3.00", body)
         self.assertIn("Stand B", body)
@@ -110,6 +110,74 @@ class EmailSummaryTests(unittest.TestCase):
         self.assertEqual(_get_category_for_item("Pepsi"), "FOUNTAIN_DRINKS")
         self.assertEqual(_get_category_for_item("Hot Dog"), "FOOD")
         self.assertIsNone(_get_category_for_item("Unknown Item"))
+
+    def test_souvenir_cups_appears_in_email_with_variance(self):
+        stand_names = ["Stand A"]
+        stand_a_rows = [
+            {"item": "Souvenir Cups", "sales": 5.0, "expected": 10.0, "actual": 7.0,
+             "variance": -3.0, "counted": True},
+        ]
+        negative_items = {"Stand A": _negative_from_rows(stand_a_rows)}
+        stand_rows = {"Stand A": stand_a_rows}
+
+        body = generate_email_body(stand_names, negative_items, stand_rows=stand_rows,
+                                   week_label="Week of 05-20-2026")
+
+        self.assertIn("SNACKS", body)
+        self.assertIn("Souvenir Cups", body)
+        self.assertIn("Souvenir Cups........... 10 expected  ⚠️  Variance: -3.00", body)
+        self.assertIn("- Items with Negative Variance: 1", body)
+
+    def test_other_disposables_excluded_from_email(self):
+        stand_names = ["Stand A"]
+        stand_a_rows = [
+            {"item": "Napkins", "sales": 0.0, "expected": 50.0, "actual": 45.0,
+             "variance": -5.0, "counted": True},
+        ]
+        negative_items = {"Stand A": _negative_from_rows(stand_a_rows)}
+        stand_rows = {"Stand A": stand_a_rows}
+
+        body = generate_email_body(stand_names, negative_items, stand_rows=stand_rows,
+                                   week_label="Week of 05-20-2026")
+
+        self.assertNotIn("Napkins", body)
+        self.assertIn("✅ All clear", body)
+
+    def test_not_counted_item_shows_marker_and_excluded_from_discrepancy(self):
+        stand_names = ["Stand A"]
+        stand_a_rows = [
+            {"item": "Hot Dog", "sales": 5.0, "expected": 10.0, "actual": 10.0,
+             "variance": 0.0, "counted": False},
+        ]
+        raw_negative = {"Stand A": _negative_from_rows(stand_a_rows)}
+        negative_items = {k: v for k, v in raw_negative.items() if v}
+        stand_rows = {"Stand A": stand_a_rows}
+
+        body = generate_email_body(stand_names, negative_items, stand_rows=stand_rows,
+                                   week_label="Week of 05-20-2026")
+
+        self.assertIn("🔲 no count entered", body)
+        self.assertNotIn("⚠️", body)
+        self.assertIn("- Stands with Discrepancies: 0", body)
+        self.assertIn("- Items with Negative Variance: 0", body)
+
+    def test_counted_short_item_flagged_as_discrepancy(self):
+        stand_names = ["Stand A"]
+        stand_a_rows = [
+            {"item": "Hot Dog", "sales": 5.0, "expected": 10.0, "actual": 7.0,
+             "variance": -3.0, "counted": True},
+        ]
+        negative_items = {"Stand A": _negative_from_rows(stand_a_rows)}
+        stand_rows = {"Stand A": stand_a_rows}
+
+        body = generate_email_body(stand_names, negative_items, stand_rows=stand_rows,
+                                   week_label="Week of 05-20-2026")
+
+        self.assertIn("⚠️", body)
+        self.assertIn("Variance: -3.00", body)
+        self.assertIn("- Stands with Discrepancies: 1", body)
+        self.assertIn("- Items with Negative Variance: 1", body)
+        self.assertNotIn("🔲", body)
 
 
 if __name__ == "__main__":

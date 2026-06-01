@@ -43,7 +43,9 @@ def _to_number(value):
 def _read_latest_week_rows(sheet, spreadsheet_id: str, stand_name: str) -> List[dict]:
     from Call_sheets import (
         COL_ACTUAL,
+        COL_CASES,
         COL_EXPECTED,
+        COL_INDIVIDUALS,
         COL_SALES,
         DATA_START_ROW,
         col_letter,
@@ -63,6 +65,8 @@ def _read_latest_week_rows(sheet, spreadsheet_id: str, stand_name: str) -> List[
     expected_idx = last_week_start + COL_EXPECTED
     sales_idx = last_week_start + COL_SALES
     actual_idx = last_week_start + COL_ACTUAL
+    individuals_idx = last_week_start + COL_INDIVIDUALS
+    cases_idx = last_week_start + COL_CASES
     parsed = []
     for row in rows:
         item = row[0].strip() if row and row[0] else ""
@@ -73,6 +77,12 @@ def _read_latest_week_rows(sheet, spreadsheet_id: str, stand_name: str) -> List[
             continue
         sales = _to_number(row[sales_idx]) if len(row) > sales_idx else None
         actual = _to_number(row[actual_idx]) if len(row) > actual_idx else None
+        individuals_raw = row[individuals_idx] if len(row) > individuals_idx else ""
+        cases_raw = row[cases_idx] if len(row) > cases_idx else ""
+        counted = bool(
+            (individuals_raw is not None and individuals_raw != "")
+            or (cases_raw is not None and cases_raw != "")
+        )
         parsed.append(
             {
                 "item": item,
@@ -80,6 +90,7 @@ def _read_latest_week_rows(sheet, spreadsheet_id: str, stand_name: str) -> List[
                 "expected": expected,
                 "actual": actual,
                 "variance": (actual - expected) if actual is not None else None,
+                "counted": counted,
             }
         )
     return parsed
@@ -88,6 +99,8 @@ def _read_latest_week_rows(sheet, spreadsheet_id: str, stand_name: str) -> List[
 def _negative_from_rows(rows: List[dict]) -> List[dict]:
     flagged = []
     for r in rows:
+        if not r.get("counted", True):
+            continue
         expected = r.get("expected")
         actual = r.get("actual")
         if expected is not None and expected < 0:
@@ -129,6 +142,10 @@ def _get_category_for_item(item_name: str):
         CANDY,
     )
 
+    # Souvenir Cups is in DISPOSABLES but is sales-tracked; surface it under SNACKS.
+    if item_name == "Souvenir Cups":
+        return "SNACKS"
+
     category_lists = {
         "ICE_CREAM_TOFTS": _TOFTS_BASE_FLAVORS,
         "NOVELTIES": NOVELTIES,
@@ -152,11 +169,9 @@ def _format_quantity(value: float) -> str:
 
 def _format_expected_line(item: str, expected: float, category: str) -> str:
     if category == "ICE_CREAM_TOFTS":
-        from Call_sheets import SCOOPS_PER_TUB
-        tubs = expected / SCOOPS_PER_TUB
-        qty_text = f"{tubs:.2f} tubs expected"
+        qty_text = f"{expected:.2f} tubs expected"
     elif category == "FOUNTAIN_DRINKS":
-        qty_text = f"{_format_quantity(expected)} oz expected"
+        qty_text = f"{_format_quantity(expected)} bags expected"
     else:
         qty_text = f"{_format_quantity(expected)} expected"
     return f"  {item.ljust(24, '.')} {qty_text}"
@@ -184,8 +199,6 @@ def generate_email_body(
     stand_rows: Dict[str, List[dict]] | None = None,
     week_label: str | None = None,
 ) -> str:
-    from Call_sheets import SCOOPS_PER_TUB
-
     stand_names = list(stand_names)
     stand_rows = stand_rows or {}
     stands_status = get_stands_with_discrepancies(stand_names, negative_items)
@@ -221,7 +234,7 @@ def generate_email_body(
             category_groups[category].append(row)
 
         has_any_items = any(category_groups[c] for c in EMAIL_SUMMARY_CATEGORY_ORDER)
-        if not has_any_items and stands_status[stand_name] == "✅ All clear":
+        if not has_any_items:
             lines.append("  ✅ All clear")
             continue
 
@@ -234,15 +247,17 @@ def generate_email_body(
                 expected_line = _format_expected_line(row["item"], row["expected"], category)
                 expected = row.get("expected")
                 actual = row.get("actual")
-                if expected is not None and expected < 0:
+                counted = row.get("counted", True)
+                if not counted:
+                    expected_line += "  🔲 no count entered"
+                elif expected is not None and expected < 0:
                     if category == "ICE_CREAM_TOFTS":
-                        expected_tubs = expected / SCOOPS_PER_TUB
-                        expected_line += f"  ⚠️  Variance: {expected_tubs:.2f} tubs"
+                        expected_line += f"  ⚠️  Variance: {expected:.2f} tubs"
                     else:
                         expected_line += f"  ⚠️  Variance: {expected:.2f}"
                 elif actual is not None and expected is not None and actual < expected:
                     if category == "ICE_CREAM_TOFTS":
-                        variance_tubs = (actual - expected) / SCOOPS_PER_TUB
+                        variance_tubs = actual - expected
                         expected_line += f"  ⚠️  Variance: {variance_tubs:.2f} tubs"
                     else:
                         variance = actual - expected

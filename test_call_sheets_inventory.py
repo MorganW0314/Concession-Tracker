@@ -501,7 +501,7 @@ class InventoryRefactorTests(unittest.TestCase):
         self.assertTrue(Call_sheets._is_item_available_at_stand("Coke", "TREMONT"))
         self.assertTrue(Call_sheets._is_item_available_at_stand("Coke", "Bevelhymer Green"))
 
-    def test_read_deliveries_converts_fountain_packages_to_stand_oz(self):
+    def test_read_deliveries_converts_fountain_packages_to_bags(self):
         header = [["Date", "Item Name", "Packages", "Units per package"]]
         rows = [["05-10-2026", "Diet RC", "2", "1"]]
         tofts_rows = [["05-10-2026", "Brownie Bandit", "2", "999"]]
@@ -513,7 +513,7 @@ class InventoryRefactorTests(unittest.TestCase):
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
             ptac = Call_sheets.read_deliveries(object(), "sid", "PTAC")
-        self.assertEqual(ptac["Diet RC"], 1280)
+        self.assertEqual(ptac["Diet RC"], 2)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, tofts_rows]):
             tofts = Call_sheets.read_deliveries(object(), "sid", "PTAC")
@@ -521,15 +521,15 @@ class InventoryRefactorTests(unittest.TestCase):
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, rows]):
             reed = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
-        self.assertEqual(reed["Diet RC"], 640)
+        self.assertEqual(reed["Diet RC"], 2)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, root_beer_rows]):
             ptac_root_beer = Call_sheets.read_deliveries(object(), "sid", "PTAC")
-        self.assertEqual(ptac_root_beer["Root Beer"], 640)
+        self.assertEqual(ptac_root_beer["Root Beer"], 1)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, root_beer_rows]):
             reed_root_beer = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
-        self.assertEqual(reed_root_beer["Root Beer"], 320)
+        self.assertEqual(reed_root_beer["Root Beer"], 1)
 
         with patch.object(Call_sheets, "get_values", side_effect=[header, popcorn_rows]):
             reed_popcorn = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
