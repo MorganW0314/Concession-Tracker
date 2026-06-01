@@ -366,78 +366,8 @@ def create_weekly_sheet(service, spreadsheet_id, stand_name):
     return new_title
 
 
-#For scoops in range(UNIT_CONVERSION)
-    
-UNIT_CONVERSION = {
-    # Vanilla
-    "Vanilla": 1,
-    "Vanilla Double Scoop": 2,
-    "Vanilla Triple Scoop": 3,
 
-    # Chocolate
-    "Chocolate": 1,
-    "Chocolate Double Scoop": 2,
-    "Chocolate Triple Scoop": 3,
 
-    # Cookies N Cream
-    "Cookies N Cream": 1,
-    "Cookies N Cream Double Scoop": 2,
-    "Cookies N Cream Triple Scoop": 3,
-
-    # Cookie Dough
-    "Cookie Dough": 1,
-    "Cookie Dough Double Scoop": 2,
-    "Cookie Dough Triple Scoop": 3,
-
-    # Cotton Candy Ice Cream (distinct from Cotton Candy candy)
-    "Cotton Candy Ice Cream": 1,
-    "Cotton Candy Ice Cream Double Scoop": 2,
-    "Cotton Candy Ice Cream Triple Scoop": 3,
-
-    # Cookie Monster
-    "Cookie Monster": 1,
-    "Cookie Monster Double Scoop": 2,
-    "Cookie Monster Triple Scoop": 3,
-
-    # Brownie Bandit
-    "Brownie Bandit": 1,
-    "Brownie Bandit Double Scoop": 2,
-    "Brownie Bandit Triple Scoop": 3,
-
-    # Birthday Cake
-    "Birthday Cake": 1,
-    "Birthday Cake Double Scoop": 2,
-    "Birthday Cake Triple Scoop": 3,
-
-    # Mint Chip
-    "Mint Chip": 1,
-    "Mint Chip Double Scoop": 2,
-    "Mint Chip Triple Scoop": 3,
-
-    # Rainbow Sherbet
-    "Rainbow Sherbet": 1,
-    "Rainbow Sherbet Double Scoop": 2,
-    "Rainbow Sherbet Triple Scoop": 3,
-    # Backward-compatible CSV spelling
-    "Rainbow Sherbert": 1,
-    "Rainbow Sherbert Double Scoop": 2,
-    "Rainbow Sherbert Triple Scoop": 3,
-
-    # PB S'Mores
-    "PB S'Mores": 1,
-    "PB S'Mores Double Scoop": 2,
-    "PB S'Mores Triple Scoop": 3,
-
-    # Blueberry Waffle Cone
-    "Blueberry Waffle Cone": 1,
-    "Blueberry Waffle Cone Double Scoop": 2,
-    "Blueberry Waffle Cone Triple Scoop": 3,
-
-    # Airheads (non-ice cream)
-    "Airheads 2 for $1": 2,
-    # Cuties — sold 2 for $1; each transaction counts as 2 units
-    "Cuties (2/$1.00)": 2,
-}
 def normalize_flavor(item):
     """Normalize only the flavor portion of an ice cream scoop item."""
     item = item.lower().strip()
@@ -2028,8 +1958,8 @@ INGREDIENTS = [
 # The sold item's own row is left unchanged; only the listed ingredients
 # are added to (accumulated in) the rows dict.
 #
-# Ice cream scoop items are handled separately via group_scoops_by_flavor /
-# UNIT_CONVERSION and do NOT need entries here.
+# Ice cream scoop items are handled separately via group_scoops_by_flavor and
+# do NOT need entries here.
 # ---------------------------------------------------------------------------
 INGREDIENT_MAP = {
     # Sandwiches and proteins
