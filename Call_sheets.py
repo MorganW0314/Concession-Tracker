@@ -888,6 +888,11 @@ def merge_modifier_rows(rows, modifier_rows):
         canonical_item = SCOOP_VARIANT_TO_BASE.get(item_name, item_name)
         sales = modifier_data.get("sales", 0)
         if not isinstance(sales, (int, float)):
+            logging.getLogger(__name__).warning(
+                "Skipping modifier row %r with non-numeric sales value %r",
+                item_name,
+                sales,
+            )
             continue
 
         if canonical_item not in rows:
