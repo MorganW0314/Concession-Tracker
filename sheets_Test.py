@@ -39,6 +39,7 @@ CONCESSION_DATA_DIR = os.path.join(os.path.dirname(__file__), "concession_data")
 
 
 def _emit_log(logger, msg, level="INFO"):
+    """Send a log message to an optional logger callback."""
     if not logger:
         return
     try:
@@ -48,6 +49,7 @@ def _emit_log(logger, msg, level="INFO"):
 
 
 def ensure_stand_folders(base_dir, stands):
+    """Create per-stand folders under base_dir and return newly created paths."""
     created = []
     for stand_name in stands:
         folder = os.path.join(base_dir, stand_name)
@@ -58,6 +60,7 @@ def ensure_stand_folders(base_dir, stands):
 
 
 def resolve_stand_files(folder):
+    """Resolve newest sales and modifier CSV files in a stand folder."""
     if not os.path.isdir(folder):
         return {"sales_csv": None, "modifier_csv": None}
 
@@ -83,6 +86,7 @@ def resolve_stand_files(folder):
 
 
 def process_stand(sheet, service, spreadsheet_id, stand_name, sales_csv, modifier_csv=None, logger=None):
+    """Run the standard single-stand processing pipeline and write the week."""
     _emit_log(logger, f"Reading {os.path.basename(sales_csv)}…")
     rows = take_items(sales_csv)
 
@@ -112,6 +116,7 @@ def run_all_stands(
     per_stand_callback=None,
     logger=None,
 ):
+    """Process all stands from per-stand folders and return success/skip/fail summary."""
     summary = {"succeeded": [], "skipped": [], "failed": []}
 
     for stand_name in stands:
@@ -579,8 +584,9 @@ class ConcessionApp(tk.Tk):
             skipped_names = ", ".join(entry["stand"] for entry in skipped)
             self._append_log(f"  Skipped: {skipped_names}", "INFO")
         if failed:
-            failed_names = ", ".join(f"{entry['stand']} ({entry['error']})" for entry in failed)
-            self._append_log(f"  Failed: {failed_names}", "ERROR")
+            self._append_log("  Failed:", "ERROR")
+            for entry in failed:
+                self._append_log(f"    - {entry['stand']}: {entry['error']}", "ERROR")
 
         status_icon = "✅" if not failed else "⚠"
         self._set_status(

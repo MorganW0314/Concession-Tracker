@@ -77,7 +77,7 @@ class ResolveStandFilesTests(unittest.TestCase):
 
             for path in [sales_old, sales_new, mod_old, mod_new]:
                 with open(path, "w", encoding="utf-8") as f:
-                    f.write("x")
+                    f.write("header\n")  # content is irrelevant; mtime drives selection
 
             os.utime(sales_old, (100, 100))
             os.utime(sales_new, (200, 200))
@@ -127,11 +127,13 @@ class RunAllStandsTests(unittest.TestCase):
                 f.write("x")
 
             os.makedirs(os.path.join(tmpdir, "FAILS"), exist_ok=True)
-            with open(os.path.join(tmpdir, "FAILS", "sales.csv"), "w", encoding="utf-8") as f:
+            fails_sales_csv = os.path.join(tmpdir, "FAILS", "sales.csv")
+            with open(fails_sales_csv, "w", encoding="utf-8") as f:
                 f.write("x")
 
             os.makedirs(os.path.join(tmpdir, "WORKS"), exist_ok=True)
-            with open(os.path.join(tmpdir, "WORKS", "sales.csv"), "w", encoding="utf-8") as f:
+            works_sales_csv = os.path.join(tmpdir, "WORKS", "sales.csv")
+            with open(works_sales_csv, "w", encoding="utf-8") as f:
                 f.write("x")
 
             def _side_effect(_sheet, _service, _spreadsheet_id, stand_name, *_args, **_kwargs):
@@ -140,9 +142,11 @@ class RunAllStandsTests(unittest.TestCase):
                 return None
 
             with patch.object(sheets_Test, "process_stand", side_effect=_side_effect) as mock_process:
+                sheet = MagicMock()
+                service = MagicMock()
                 summary = sheets_Test.run_all_stands(
-                    sheet=MagicMock(),
-                    service=MagicMock(),
+                    sheet=sheet,
+                    service=service,
                     spreadsheet_id="sheet-id",
                     stands=stands,
                     base_dir=tmpdir,
@@ -158,8 +162,8 @@ class RunAllStandsTests(unittest.TestCase):
             self.assertEqual(mock_process.call_count, 2)
             mock_process.assert_has_calls(
                 [
-                    call(unittest.mock.ANY, unittest.mock.ANY, "sheet-id", "FAILS", unittest.mock.ANY, modifier_csv=None, logger=None),
-                    call(unittest.mock.ANY, unittest.mock.ANY, "sheet-id", "WORKS", unittest.mock.ANY, modifier_csv=None, logger=None),
+                    call(sheet, service, "sheet-id", "FAILS", fails_sales_csv, modifier_csv=None, logger=None),
+                    call(sheet, service, "sheet-id", "WORKS", works_sales_csv, modifier_csv=None, logger=None),
                 ],
                 any_order=False,
             )
