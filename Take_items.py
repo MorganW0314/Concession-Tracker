@@ -177,6 +177,7 @@ def take_items(csv_file_path, stand_name=None):
         for line in reader:
             raw_row_count += 1
             item = (line.get("Item Name") or "").strip()
+            category = (line.get("Category") or "").strip()
 
             sold_raw = (line.get("Units Sold") or "").strip()
             refunded_raw = (line.get("Units Refunded") or "").strip()
@@ -193,7 +194,9 @@ def take_items(csv_file_path, stand_name=None):
                 )
                 sold = refunded = 0
 
-            net_sales = (sold - refunded) * UNITS_PER_SALE.get(item, 1)
+            # Square exports may represent "Units Refunded" as either positive
+            # or negative counts; subtract the magnitude in both cases.
+            net_sales = (sold - abs(refunded)) * UNITS_PER_SALE.get(item, 1)
 
             if item == "":
                 skipped_rows += 1
@@ -214,7 +217,7 @@ def take_items(csv_file_path, stand_name=None):
             # tracked entirely via the modifier-sales CSV (Ice Cream Flavor
             # 1/2/3 modifier sets).  Base items ("Double Dip", "Triple Dip")
             # are already skipped above via MODIFIER_ITEMS.
-            if item in _TOFTS_ICE_CREAM_SKIP_ITEMS:
+            if item in _TOFTS_ICE_CREAM_SKIP_ITEMS and category.casefold() != "candy":
                 _logger.debug(
                     "⏭️  Skipping legacy ice cream item %r — tracked via modifier CSV",
                     item,
