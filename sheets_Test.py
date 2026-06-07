@@ -2,6 +2,7 @@ import os
 import glob
 import logging
 import threading
+import traceback
 import tkinter as tk
 from tkinter import ttk, font as tkfont
 
@@ -33,6 +34,134 @@ STANDS = [
     "DEVON",
     "NWSC",
 ]
+
+CONCESSION_DATA_DIR = os.path.join(os.path.dirname(__file__), "concession_data")
+
+
+def _emit_log(logger, msg, level="INFO"):
+    if not logger:
+        return
+    try:
+        logger(msg, level=level)
+    except TypeError:
+        logger(msg)
+
+
+def ensure_stand_folders(base_dir, stands):
+    created = []
+    for stand_name in stands:
+        folder = os.path.join(base_dir, stand_name)
+        if not os.path.isdir(folder):
+            os.makedirs(folder, exist_ok=True)
+            created.append(folder)
+    return created
+
+
+def resolve_stand_files(folder):
+    if not os.path.isdir(folder):
+        return {"sales_csv": None, "modifier_csv": None}
+
+    csv_files = [
+        os.path.join(folder, name)
+        for name in os.listdir(folder)
+        if name.lower().endswith(".csv")
+    ]
+    modifier_candidates = [
+        path
+        for path in csv_files
+        if os.path.basename(path).lower().startswith("modifier-sales-")
+    ]
+    sales_candidates = [
+        path
+        for path in csv_files
+        if not os.path.basename(path).lower().startswith("modifier-sales-")
+    ]
+
+    sales_csv = max(sales_candidates, key=os.path.getmtime) if sales_candidates else None
+    modifier_csv = max(modifier_candidates, key=os.path.getmtime) if modifier_candidates else None
+    return {"sales_csv": sales_csv, "modifier_csv": modifier_csv}
+
+
+def process_stand(sheet, service, spreadsheet_id, stand_name, sales_csv, modifier_csv=None, logger=None):
+    _emit_log(logger, f"Reading {os.path.basename(sales_csv)}…")
+    rows = take_items(sales_csv)
+
+    if modifier_csv:
+        _emit_log(logger, f"Reading modifier data from {os.path.basename(modifier_csv)}…")
+        modifier_rows = take_modifiers(
+            modifier_csv,
+            week_start_date=None,
+            week_end_date=None,
+            stand_name=stand_name,
+        )
+        merge_modifier_rows(rows, modifier_rows)
+        _emit_log(logger, f"Merged modifier sales for {len(modifier_rows)} items.")
+    else:
+        _emit_log(logger, "No modifier-sales-*.csv file found in same folder — skipping modifier step.")
+
+    _emit_log(logger, "Writing formatted sheet…")
+    write_full_week(sheet, service, spreadsheet_id, stand_name, rows)
+
+
+def run_all_stands(
+    sheet,
+    service,
+    spreadsheet_id,
+    stands,
+    base_dir,
+    per_stand_callback=None,
+    logger=None,
+):
+    summary = {"succeeded": [], "skipped": [], "failed": []}
+
+    for stand_name in stands:
+        folder = os.path.join(base_dir, stand_name)
+        _emit_log(logger, f"Processing {stand_name}…")
+        if per_stand_callback:
+            per_stand_callback(stand_name, "processing", None)
+
+        if not os.path.isdir(folder):
+            reason = "missing folder"
+            summary["skipped"].append({"stand": stand_name, "reason": reason})
+            _emit_log(logger, f"  ⏭ skipped — {reason}")
+            if per_stand_callback:
+                per_stand_callback(stand_name, "skipped", reason)
+            continue
+
+        files = resolve_stand_files(folder)
+        sales_csv = files["sales_csv"]
+        modifier_csv = files["modifier_csv"]
+        if not sales_csv:
+            reason = "no sales CSV"
+            summary["skipped"].append({"stand": stand_name, "reason": reason})
+            _emit_log(logger, f"  ⏭ skipped — {reason}")
+            if per_stand_callback:
+                per_stand_callback(stand_name, "skipped", reason)
+            continue
+
+        try:
+            process_stand(
+                sheet,
+                service,
+                spreadsheet_id,
+                stand_name,
+                sales_csv,
+                modifier_csv=modifier_csv,
+                logger=logger,
+            )
+            summary["succeeded"].append(stand_name)
+            _emit_log(logger, "  ✓ wrote week")
+            if per_stand_callback:
+                per_stand_callback(stand_name, "succeeded", None)
+        except Exception as exc:
+            error_text = str(exc)
+            summary["failed"].append({"stand": stand_name, "error": error_text})
+            _emit_log(logger, f"  ✗ error: {error_text}", level="ERROR")
+            _emit_log(logger, traceback.format_exc(), level="ERROR")
+            if per_stand_callback:
+                per_stand_callback(stand_name, "failed", error_text)
+
+    return summary
 
 # ------------------------------------------------------------
 # GUI LOG HANDLER — writes logging records into the text widget
@@ -67,6 +196,7 @@ class ConcessionApp(tk.Tk):
         self.minsize(720, 560)
         self._configure_styles()
         self._build_ui()
+        ensure_stand_folders(CONCESSION_DATA_DIR, STANDS)
         self._refresh_csv_list()
 
     # ----------------------------------------------------------
@@ -167,6 +297,38 @@ class ConcessionApp(tk.Tk):
         )
         self._run_btn.pack(side="left")
 
+        self._run_all_btn = tk.Button(
+            btn_frame,
+            text="▶ Run All Stands",
+            font=self._font_btn,
+            bg="#14508f",
+            fg="white",
+            activebackground="#114274",
+            activeforeground="white",
+            relief="flat",
+            padx=24,
+            pady=8,
+            cursor="hand2",
+            command=self._on_run_all,
+        )
+        self._run_all_btn.pack(side="left", padx=(10, 0))
+
+        self._create_folders_btn = tk.Button(
+            btn_frame,
+            text="📁 Create Stand Folders",
+            font=self._font_btn,
+            bg="#5a5a5a",
+            fg="white",
+            activebackground="#474747",
+            activeforeground="white",
+            relief="flat",
+            padx=16,
+            pady=8,
+            cursor="hand2",
+            command=self._on_create_stand_folders,
+        )
+        self._create_folders_btn.pack(side="left", padx=(10, 0))
+
         self._sync_btn = tk.Button(
             btn_frame,
             text="🔄 Sync Item List",
@@ -254,8 +416,7 @@ class ConcessionApp(tk.Tk):
     # ----------------------------------------------------------
     def _refresh_csv_list(self):
         """Re-scan ~/Downloads for CSV files and populate the combo."""
-        concession_data = os.path.join(os.path.dirname(__file__), "concession_data")
-        files = sorted(glob.glob(os.path.join(concession_data, "*.csv")))
+        files = sorted(glob.glob(os.path.join(CONCESSION_DATA_DIR, "*.csv")))
         names = [os.path.basename(f) for f in files]
         self._csv_files = files
         self._csv_combo["values"] = names
@@ -279,6 +440,8 @@ class ConcessionApp(tk.Tk):
 
     def _disable_controls(self):
         self._run_btn.config(state="disabled")
+        self._run_all_btn.config(state="disabled")
+        self._create_folders_btn.config(state="disabled")
         self._sync_btn.config(state="disabled")
         self._email_btn.config(state="disabled")
         self._stand_combo.config(state="disabled")
@@ -286,10 +449,17 @@ class ConcessionApp(tk.Tk):
 
     def _enable_controls(self):
         self._run_btn.config(state="normal")
+        self._run_all_btn.config(state="normal")
+        self._create_folders_btn.config(state="normal")
         self._sync_btn.config(state="normal")
         self._email_btn.config(state="normal")
         self._stand_combo.config(state="readonly")
         self._csv_combo.config(state="readonly")
+
+    def _clear_log(self):
+        self._log_text.config(state="normal")
+        self._log_text.delete("1.0", tk.END)
+        self._log_text.config(state="disabled")
 
     # ----------------------------------------------------------
     # RUN handler
@@ -311,10 +481,7 @@ class ConcessionApp(tk.Tk):
         self._disable_controls()
         self._set_status("⏳  Running…", "#1a6b3a")
 
-        # Clear previous log
-        self._log_text.config(state="normal")
-        self._log_text.delete("1.0", tk.END)
-        self._log_text.config(state="disabled")
+        self._clear_log()
 
         threading.Thread(
             target=self._run_processing,
@@ -337,32 +504,17 @@ class ConcessionApp(tk.Tk):
             service = build("sheets", "v4", credentials=creds)
             sheet   = service.spreadsheets()
 
-            # Read CSV
-            self._log(f"Reading {os.path.basename(csv_file)}…")
-            rows = take_items(csv_file)
-
-            # Check for a modifier file in the same folder as the item-sales CSV.
-            # Any file matching modifier-sales-*.csv in that folder is accepted;
-            # if multiple are found the most-recently modified one is used.
             folder = os.path.dirname(os.path.abspath(csv_file))
-            modifier_candidates = glob.glob(os.path.join(folder, "modifier-sales-*.csv"))
-            if modifier_candidates:
-                modifier_file = max(modifier_candidates, key=os.path.getmtime)
-                self._log(f"Reading modifier data from {os.path.basename(modifier_file)}…")
-                modifier_rows = take_modifiers(
-                    modifier_file,
-                    week_start_date=None,
-                    week_end_date=None,
-                    stand_name=stand_name,
-                )
-                merge_modifier_rows(rows, modifier_rows)
-                self._log(f"Merged modifier sales for {len(modifier_rows)} items.")
-            else:
-                self._log("No modifier-sales-*.csv file found in same folder — skipping modifier step.")
-
-            # Write merged item + modifier sales to a new week block
-            self._log("Writing formatted sheet…")
-            write_full_week(sheet, service, SPREADSHEET_ID, stand_name, rows)
+            files = resolve_stand_files(folder)
+            process_stand(
+                sheet,
+                service,
+                SPREADSHEET_ID,
+                stand_name,
+                csv_file,
+                modifier_csv=files["modifier_csv"],
+                logger=self._log,
+            )
 
             # Success
             self.after(0, self._on_success, stand_name)
@@ -370,6 +522,72 @@ class ConcessionApp(tk.Tk):
         except Exception as exc:
             logging.getLogger(__name__).error("Processing failed:", exc_info=True)
             self.after(0, self._on_error)
+
+    def _on_create_stand_folders(self):
+        created = ensure_stand_folders(CONCESSION_DATA_DIR, STANDS)
+        if created:
+            self._log(f"Created {len(created)} stand folder(s) under concession_data.")
+        else:
+            self._log("All stand folders already exist.")
+        self._set_status("✅ Stand folders ready.", "#1a6b3a")
+
+    def _on_run_all(self):
+        self._disable_controls()
+        self._set_status("⏳  Running all stands…", "#14508f")
+        self._clear_log()
+        threading.Thread(target=self._run_all_processing, daemon=True).start()
+
+    def _run_all_processing(self):
+        try:
+            self._log("Authenticating with Google Sheets…")
+            creds = Credentials.from_service_account_file(
+                CREDENTIALS_PATH,
+                scopes=["https://www.googleapis.com/auth/spreadsheets"],
+            )
+            service = build("sheets", "v4", credentials=creds)
+            sheet = service.spreadsheets()
+
+            summary = run_all_stands(
+                sheet,
+                service,
+                SPREADSHEET_ID,
+                STANDS,
+                CONCESSION_DATA_DIR,
+                logger=self._log,
+            )
+            self.after(0, self._on_run_all_success, summary)
+        except Exception:
+            logging.getLogger(__name__).error("Run all stands failed:", exc_info=True)
+            self.after(0, self._on_error)
+
+    def _on_run_all_success(self, summary):
+        succeeded = summary["succeeded"]
+        skipped = summary["skipped"]
+        failed = summary["failed"]
+
+        self._append_log(
+            (
+                f"\nSummary: {len(succeeded)} processed, "
+                f"{len(skipped)} skipped, {len(failed)} failed."
+            ),
+            "INFO",
+        )
+
+        if succeeded:
+            self._append_log(f"  Processed: {', '.join(succeeded)}", "INFO")
+        if skipped:
+            skipped_names = ", ".join(entry["stand"] for entry in skipped)
+            self._append_log(f"  Skipped: {skipped_names}", "INFO")
+        if failed:
+            failed_names = ", ".join(f"{entry['stand']} ({entry['error']})" for entry in failed)
+            self._append_log(f"  Failed: {failed_names}", "ERROR")
+
+        status_icon = "✅" if not failed else "⚠"
+        self._set_status(
+            f"{status_icon} {len(succeeded)} processed · {len(skipped)} skipped · {len(failed)} failed",
+            "#1a6b3a" if not failed else "#c0392b",
+        )
+        self._enable_controls()
 
     def _on_send_summary_email(self):
         self._disable_controls()
