@@ -45,6 +45,7 @@ from Call_sheets import (
     RAINBOW_SHERBET_FLOAT_STANDS,
     SLUSHIE_FLAVORS,
     SNACKS,
+    merge_modifier_rows,
 )
 from Take_items import (
     BLOOM_POP_FLAVOR_SET_PREFIX,
@@ -342,6 +343,52 @@ class TakeItemsSkipTests(unittest.TestCase):
             result = take_items(path)
             self.assertNotIn("Bloom Pop", result)
             self.assertNotIn("Poppi", result)
+            self.assertEqual(result["Hot Dog"]["sales"], 2)
+        finally:
+            os.unlink(path)
+
+    def test_cotton_candy_candy_category_is_not_skipped_and_refund_applies(self):
+        fieldnames = [
+            "Item Name", "Item Variation", "SKU", "Category", "Items Sold",
+            "Gross Sales", "Items Refunded", "Refunds", "Discounts & Comps",
+            "Net Sales", "Tax", "Unit", "Units Sold", "Units Refunded",
+        ]
+        path = _write_tmp_csv([
+            {
+                "Item Name": "Cotton Candy",
+                "Item Variation": "Regular",
+                "SKU": ".965",
+                "Category": "Candy",
+                "Items Sold": "202",
+                "Gross Sales": "$808.00",
+                "Items Refunded": "-1",
+                "Refunds": "-$4.00",
+                "Discounts & Comps": "-$6.00",
+                "Net Sales": "$798.00",
+                "Tax": "$0.00",
+                "Unit": "ea",
+                "Units Sold": "202",
+                "Units Refunded": "-1",
+            },
+        ], fieldnames=fieldnames)
+        try:
+            result = take_items(path)
+            self.assertIn("Cotton Candy", result)
+            self.assertEqual(result["Cotton Candy"]["sales"], 201)
+        finally:
+            os.unlink(path)
+
+    def test_ice_cream_named_rows_still_skipped_without_candy_category(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Cotton Candy", "Item Variation": "Regular", "Category": "", "Units Sold": "9", "Units Refunded": "0"},
+            {"Item Name": "Cotton Candy", "Item Variation": "Regular", "Category": "Toft's Ice Cream", "Units Sold": "7", "Units Refunded": "0"},
+            {"Item Name": "Vanilla", "Item Variation": "Regular", "Category": "", "Units Sold": "5", "Units Refunded": "0"},
+            {"Item Name": "Hot Dog", "Item Variation": "Regular", "Category": "Food", "Units Sold": "2", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertNotIn("Cotton Candy", result)
+            self.assertNotIn("Vanilla", result)
             self.assertEqual(result["Hot Dog"]["sales"], 2)
         finally:
             os.unlink(path)
@@ -861,6 +908,72 @@ class MultiByItemTests(unittest.TestCase):
             self.assertEqual(result["Airheads 2 for $1"]["sales"], 8)
         finally:
             os.unlink(path)
+
+    def test_refund_sign_is_agnostic_for_regular_items(self):
+        for refunded in ("-2", "2"):
+            with self.subTest(refunded=refunded):
+                path = _write_tmp_csv([
+                    {"Item Name": "Hot Dog", "Item Variation": "Regular",
+                     "Units Sold": "10", "Units Refunded": refunded},
+                ])
+                try:
+                    result = take_items(path)
+                    self.assertEqual(result["Hot Dog"]["sales"], 8)
+                finally:
+                    os.unlink(path)
+
+    def test_cuties_refund_scales_with_multiplier_for_negative_refunds(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Cuties (2/$1.00)", "Item Variation": "Regular",
+             "Units Sold": "5", "Units Refunded": "-1"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertEqual(result["Cuties (2/$1.00)"]["sales"], 8)
+        finally:
+            os.unlink(path)
+
+    def test_cotton_candy_candy_and_ice_cream_modifier_stay_separate(self):
+        item_fieldnames = [
+            "Item Name", "Item Variation", "SKU", "Category", "Items Sold",
+            "Gross Sales", "Items Refunded", "Refunds", "Discounts & Comps",
+            "Net Sales", "Tax", "Unit", "Units Sold", "Units Refunded",
+        ]
+        items_path = _write_tmp_csv([
+            {
+                "Item Name": "Cotton Candy",
+                "Item Variation": "Regular",
+                "SKU": ".965",
+                "Category": "Candy",
+                "Items Sold": "202",
+                "Gross Sales": "$808.00",
+                "Items Refunded": "-1",
+                "Refunds": "-$4.00",
+                "Discounts & Comps": "-$6.00",
+                "Net Sales": "$798.00",
+                "Tax": "$0.00",
+                "Unit": "ea",
+                "Units Sold": "202",
+                "Units Refunded": "-1",
+            },
+        ], fieldnames=item_fieldnames)
+        modifiers_path = _write_tmp_csv([
+            {
+                "Modifier Set": "Ice Cream Flavor",
+                "Modifier": "Cotton Candy",
+                "Qty Sold": "572",
+                "Gross Sales": "$0.00",
+            },
+        ], fieldnames=["Modifier Set", "Modifier", "Qty Sold", "Gross Sales"])
+        try:
+            rows = take_items(items_path)
+            modifier_rows = take_modifiers(modifiers_path)
+            merge_modifier_rows(rows, modifier_rows)
+            self.assertEqual(rows["Cotton Candy"]["sales"], 201)
+            self.assertEqual(rows["Cotton Candy Ice Cream"]["sales"], 572)
+        finally:
+            os.unlink(items_path)
+            os.unlink(modifiers_path)
 
     def test_control_item_not_doubled(self):
         path = _write_tmp_csv([
