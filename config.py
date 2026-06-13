@@ -11,6 +11,10 @@ class Config:
     @property
     def SPREADSHEET_ID(self):
         if self.USE_TEST_MODE:
+            if self.TEST_SPREADSHEET_ID == "PASTE_YOUR_TEST_COPY_ID_HERE":
+                raise ValueError(
+                    "CONCESSION_TEST_MODE is enabled but TEST_SPREADSHEET_ID is not configured."
+                )
             print("⚠️  RUNNING IN TEST MODE - using test spreadsheet")
             return self.TEST_SPREADSHEET_ID
         return self.PRODUCTION_SPREADSHEET_ID

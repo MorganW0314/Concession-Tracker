@@ -18,10 +18,15 @@ class ConfigTests(unittest.TestCase):
     def test_uses_test_spreadsheet_id_when_enabled(self):
         with patch.dict(os.environ, {"CONCESSION_TEST_MODE": "true"}):
             module = importlib.reload(config_module)
-            self.assertEqual(
-                module.config.SPREADSHEET_ID,
-                module.Config.TEST_SPREADSHEET_ID,
-            )
+            with patch.object(module.Config, "TEST_SPREADSHEET_ID", "test-sheet-id"):
+                module.config = module.Config()
+                self.assertEqual(module.config.SPREADSHEET_ID, "test-sheet-id")
+
+    def test_raises_when_test_mode_enabled_without_test_spreadsheet_id(self):
+        with patch.dict(os.environ, {"CONCESSION_TEST_MODE": "true"}):
+            module = importlib.reload(config_module)
+            with self.assertRaises(ValueError):
+                _ = module.config.SPREADSHEET_ID
 
 
 if __name__ == "__main__":

@@ -129,13 +129,7 @@ MANUAL_ENTRY_ONLY_ITEMS = {"Rainbow Sprinkles", "Whipped Cream"}
 
 def normalize_csv_item_name(item_name):
     """Map CSV price-prefixed names to canonical sheet names."""
-    aliases = {
-        "$1 dog": "Hot Dog",
-        "$3 brats": "Brats",
-        "$5 hamburger": "Hamburgers",
-    }
-    normalized = normalize_item_name(item_name)
-    return aliases.get(normalized, item_name)
+    return canonicalize_item_name(item_name)
 
 
 def _validate_combo_breakdown():
