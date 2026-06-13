@@ -124,6 +124,19 @@ UNITS_PER_SALE = {
 
 _logger = _make_logger("concession.Take_items")
 
+MANUAL_ENTRY_ONLY_ITEMS = {"Rainbow Sprinkles", "Whipped Cream"}
+
+
+def normalize_csv_item_name(item_name):
+    """Map CSV price-prefixed names to canonical sheet names."""
+    aliases = {
+        "$1 dog": "Hot Dog",
+        "$3 brats": "Brats",
+        "$5 hamburger": "Hamburgers",
+    }
+    normalized = normalize_item_name(item_name)
+    return aliases.get(normalized, item_name)
+
 
 def _validate_combo_breakdown():
     """Warn at import time if any combo component is listed only in COMBO_BREAKDOWN
@@ -176,7 +189,7 @@ def take_items(csv_file_path, stand_name=None):
 
         for line in reader:
             raw_row_count += 1
-            item = (line.get("Item Name") or "").strip()
+            item = normalize_csv_item_name((line.get("Item Name") or "").strip())
             category = (line.get("Category") or "").strip()
 
             sold_raw = (line.get("Units Sold") or "").strip()
@@ -199,6 +212,10 @@ def take_items(csv_file_path, stand_name=None):
             net_sales = (sold - abs(refunded)) * UNITS_PER_SALE.get(item, 1)
 
             if item == "":
+                skipped_rows += 1
+                continue
+
+            if item in MANUAL_ENTRY_ONLY_ITEMS:
                 skipped_rows += 1
                 continue
 
@@ -411,6 +428,8 @@ def take_modifiers(csv_file_path, week_start_date=None, week_end_date=None, stan
                 elif base_name == "Gatorade":
                     item_name = f"Gatorade - {modifier}"
                 elif base_name in {ICE_CREAM_TOPPINGS_PREFIX, "Toppings", "Topping"}:
+                    if modifier in MANUAL_ENTRY_ONLY_ITEMS:
+                        continue
                     item_name = modifier
                 elif base_name in {"Fountain Drink Flavor", "Fountain Drink", "Fountain"}:
                     if modifier == "RC":

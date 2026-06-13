@@ -7,6 +7,9 @@ _EXPLICIT_ITEM_NAME_MAPPINGS = {
 
 _CANONICAL_ITEM_NAME_ALIASES = {
     "souvenir cup": "Souvenir Cups",
+    "$1 dog": "Hot Dog",
+    "$3 brats": "Brats",
+    "$5 hamburger": "Hamburgers",
 }
 
 

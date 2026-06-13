@@ -8,6 +8,7 @@ from tkinter import ttk, font as tkfont
 
 from Take_items import take_items, take_modifiers   # your CSV ingestion functions
 from Call_sheets import write_full_week, sync_stand_item_list, merge_modifier_rows
+from config import config
 from email_summary import send_summary_email
 from googleapiclient.discovery import build # type: ignore
 from google.oauth2.service_account import Credentials
@@ -15,7 +16,7 @@ from google.oauth2.service_account import Credentials
 # ------------------------------------------------------------
 # CONFIG
 # ------------------------------------------------------------
-SPREADSHEET_ID = "13MhJ9cykz_l89PvV2KrVHHL2-TEos6JWt43dMMYFR1U"
+SPREADSHEET_ID = config.SPREADSHEET_ID
 
 CREDENTIALS_PATH = r"C:\Users\willi\OneDrive\Desktop\inventory_Script\Credentials-personal.json"
 

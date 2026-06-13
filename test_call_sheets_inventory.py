@@ -62,6 +62,7 @@ def _write_full_week_item_row(category_order, rows, target_item, stand_name="PTA
         patch.object(Call_sheets, "clear_spoilage_sheet", return_value=None),
         patch.object(Call_sheets, "extract_week_dates_from_label", return_value=(None, None)),
         patch.object(Call_sheets, "read_deliveries", return_value={}),
+        patch.object(Call_sheets, "read_transfers", return_value={"to": {}, "from": {}}),
         patch.object(Call_sheets, "read_item_row_map", return_value=item_row_map),
         patch.object(Call_sheets, "_qty_per_case_value", return_value=1),
         patch.object(Call_sheets, "_sync_master_items_tab", return_value=None),
@@ -146,6 +147,14 @@ class InventoryRefactorTests(unittest.TestCase):
         )
         self.assertNotIn("Hot Dogs", Call_sheets.FOOD)
         self.assertNotIn("Hot Dogs", Call_sheets.INGREDIENTS)
+
+    def test_nwsc_food_items_include_brats_and_hamburgers(self):
+        self.assertIn("Brats", Call_sheets.FOOD)
+        self.assertIn("Hamburgers", Call_sheets.FOOD)
+        self.assertEqual(Call_sheets.QUANTITY_PER_CASE["Brats"], 50)
+        self.assertEqual(Call_sheets.QUANTITY_PER_CASE["Hamburgers"], 40)
+        self.assertEqual(Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Brats"], {"NWSC"})
+        self.assertEqual(Call_sheets.LOCATION_SPECIFIC_ITEM_STANDS["Hamburgers"], {"NWSC"})
 
     def test_food_list_excludes_menu_items_tracked_via_ingredients(self):
         self.assertNotIn("Chicken Salad Sandwich", Call_sheets.FOOD)
@@ -294,6 +303,7 @@ class InventoryRefactorTests(unittest.TestCase):
             patch.object(Call_sheets, "clear_spoilage_sheet", return_value=None),
             patch.object(Call_sheets, "extract_week_dates_from_label", return_value=(None, None)),
             patch.object(Call_sheets, "read_deliveries", return_value={}),
+            patch.object(Call_sheets, "read_transfers", return_value={"to": {}, "from": {}}),
             patch.object(Call_sheets, "read_item_row_map", return_value={"Blueberry Waffle Cone": 3, "Vanilla": 4}),
             patch.object(Call_sheets, "_qty_per_case_value", return_value=1),
             patch.object(Call_sheets, "_sync_master_items_tab", return_value=None),
@@ -341,6 +351,7 @@ class InventoryRefactorTests(unittest.TestCase):
             patch.object(Call_sheets, "clear_spoilage_sheet", return_value=None),
             patch.object(Call_sheets, "extract_week_dates_from_label", return_value=(None, None)),
             patch.object(Call_sheets, "read_deliveries", return_value={}),
+            patch.object(Call_sheets, "read_transfers", return_value={"to": {}, "from": {}}),
             patch.object(Call_sheets, "read_item_row_map", return_value={"brownie bandit": 3}),
             patch.object(Call_sheets, "_qty_per_case_value", return_value=1),
             patch.object(Call_sheets, "_sync_master_items_tab", return_value=None),
@@ -404,6 +415,7 @@ class InventoryRefactorTests(unittest.TestCase):
             patch.object(Call_sheets, "clear_spoilage_sheet", return_value=None),
             patch.object(Call_sheets, "extract_week_dates_from_label", return_value=(None, None)),
             patch.object(Call_sheets, "read_deliveries", return_value={"Brownie Bandit": 2}),
+            patch.object(Call_sheets, "read_transfers", return_value={"to": {}, "from": {}}),
             patch.object(Call_sheets, "read_item_row_map", return_value={"brownie bandit": 3}),
             patch.object(Call_sheets, "_qty_per_case_value", return_value=1),
             patch.object(Call_sheets, "_sync_master_items_tab", return_value=None),
@@ -667,6 +679,56 @@ class InventoryRefactorTests(unittest.TestCase):
         with patch.object(Call_sheets, "get_values", side_effect=[header, cheese_rows]):
             reed_cheese = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_cheese["Cheese"], Call_sheets.CHEESE_SLICES_PER_PACKAGE)
+
+    def test_read_transfers_groups_by_to_and_from_stands(self):
+        header = [["DATE", "FROM STAND", "TO STAND", "ITEM NAME", "INDIVIDUALS", "CASES", "QTY PER CASE"]]
+        transfer_rows = [
+            ["06-10-2026", "PTAC", "NWSC", "Hot Dog", "2", "1", "10"],
+            ["06-01-2026", "PTAC", "NWSC", "Hot Dog", "5", "0", "0"],
+        ]
+        with patch.object(Call_sheets, "get_values", side_effect=[header, transfer_rows]):
+            transfers = Call_sheets.read_transfers(
+                object(),
+                "sid",
+                week_start_date=Call_sheets.datetime(2026, 6, 4).date(),
+                week_end_date=Call_sheets.datetime(2026, 6, 10).date(),
+            )
+
+        self.assertEqual(transfers["from"]["PTAC"]["Hot Dog"], 12)
+        self.assertEqual(transfers["to"]["NWSC"]["Hot Dog"], 12)
+
+    def test_write_full_week_applies_transfer_out_and_in(self):
+        fake_sheet = MagicMock()
+        fake_service = MagicMock()
+        fake_service.spreadsheets().values().batchUpdate().execute.return_value = {}
+        fake_service.spreadsheets().values().update().execute.return_value = {}
+        fake_service.spreadsheets().batchUpdate().execute.return_value = {}
+
+        category_order = [("FOOD", ["Hot Dog"])]
+        item_row_map = {Call_sheets.normalize_item_name("Hot Dog"): 3}
+        rows = {"Hot Dog": {"starting": 0, "deliveries": 0, "sales": 0, "spoilage": 0}}
+
+        with (
+            patch.object(Call_sheets, "ensure_stand_sheet_exists", return_value=None),
+            patch.object(Call_sheets, "get_sheet_id", return_value=123),
+            patch.object(Call_sheets, "_build_category_order_for_stand", return_value=category_order),
+            patch.object(Call_sheets, "find_last_week_start_col", return_value=0),
+            patch.object(Call_sheets, "read_last_week_actuals_from_stand_sheet", return_value={"hot dog": 20}),
+            patch.object(Call_sheets, "read_spoilage", return_value={}),
+            patch.object(Call_sheets, "clear_spoilage_sheet", return_value=None),
+            patch.object(Call_sheets, "extract_week_dates_from_label", return_value=(None, None)),
+            patch.object(Call_sheets, "read_deliveries", return_value={"Hot Dog": 4}),
+            patch.object(Call_sheets, "read_transfers", return_value={"to": {"PTAC": {"Hot Dog": 3}}, "from": {"PTAC": {"Hot Dog": 5}}}),
+            patch.object(Call_sheets, "read_item_row_map", return_value=item_row_map),
+            patch.object(Call_sheets, "_qty_per_case_value", return_value=1),
+            patch.object(Call_sheets, "_sync_master_items_tab", return_value=None),
+        ):
+            Call_sheets.write_full_week(fake_sheet, fake_service, "sid", "PTAC", rows)
+
+        body = fake_service.spreadsheets.return_value.values.return_value.batchUpdate.call_args.kwargs["body"]
+        item_row = next(entry["values"][0] for entry in body["data"] if entry["range"] == "'PTAC'!B3:M3")
+        self.assertEqual(item_row[0], 15)  # starting: 20 - 5 transfer out
+        self.assertEqual(item_row[1], 7)   # deliveries: 4 + 3 transfer in
 
     def test_qty_per_case_value_for_root_beer_uses_physical_bag_units(self):
         self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "PTAC"), 1)

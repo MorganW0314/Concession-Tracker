@@ -1,7 +1,8 @@
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+from config import config
 
-SPREADSHEET_ID = "YOUR_SHEET_ID"
+SPREADSHEET_ID = config.SPREADSHEET_ID
 SPOILAGE_RANGE = "Spoilage!A:C"  # Date, Item, Quantity
 
 def load_spoilage():
@@ -45,5 +46,4 @@ def load_spoilage():
         spoilage[item] += qty
 
     return spoilage
-
 
