@@ -58,6 +58,7 @@ from Take_items import (
     POPPI_FLAVOR_SET_PREFIX,
     SLUSHIE_FLAVOR_SET_PREFIX,
     _TOFTS_ICE_CREAM_SKIP_ITEMS,
+    normalize_csv_item_name,
     take_items,
     take_modifiers,
 )
@@ -284,6 +285,25 @@ class TakeItemsSkipTests(unittest.TestCase):
             self.assertIn("Souvenir Cups", result)
             self.assertNotIn("Souvenir Cup", result)
             self.assertEqual(result["Souvenir Cups"]["sales"], 17)
+        finally:
+            os.unlink(path)
+
+    def test_csv_aliases_map_to_canonical_names(self):
+        self.assertEqual(normalize_csv_item_name("$1 Dog"), "Hot Dog")
+        self.assertEqual(normalize_csv_item_name("$3 Brats"), "Brats")
+        self.assertEqual(normalize_csv_item_name("$5 Hamburger"), "Hamburgers")
+
+    def test_manual_only_toppings_are_skipped_from_item_sales_csv(self):
+        path = _write_tmp_csv([
+            {"Item Name": "Rainbow Sprinkles", "Item Variation": "Regular", "Units Sold": "3", "Units Refunded": "0"},
+            {"Item Name": "Whipped Cream", "Item Variation": "Regular", "Units Sold": "2", "Units Refunded": "0"},
+            {"Item Name": "Hot Dog", "Item Variation": "Regular", "Units Sold": "1", "Units Refunded": "0"},
+        ])
+        try:
+            result = take_items(path)
+            self.assertNotIn("Rainbow Sprinkles", result)
+            self.assertNotIn("Whipped Cream", result)
+            self.assertEqual(result["Hot Dog"]["sales"], 1)
         finally:
             os.unlink(path)
 
@@ -544,7 +564,7 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
         ])
         try:
             result = take_modifiers(path)
-            self.assertEqual(result["Rainbow Sprinkles"]["sales"], 3)
+            self.assertNotIn("Rainbow Sprinkles", result)
             self.assertEqual(result["RC Cola"]["sales"], 4)
             self.assertEqual(result["Coke"]["sales"], 2)
             self.assertEqual(result["Ham & Cheese Sandwich"]["sales"], 5)
@@ -554,6 +574,18 @@ class TakeModifiersIceCreamTests(unittest.TestCase):
             self.assertEqual(result["M&M - Peanut"]["sales"], 2)
             self.assertEqual(result["Sprite"]["sales"], 3)
             self.assertEqual(result["Sunflower Seeds - Dill Pickle"]["sales"], 2)
+        finally:
+            os.unlink(path)
+
+    def test_topping_modifiers_manual_only_items_are_skipped(self):
+        path = _write_tmp_csv([
+            {"Modifier Set": "Ice Cream Toppings", "Modifier": "Whipped Cream", "Qty Sold": "3", "Gross Sales": "$0.00"},
+            {"Modifier Set": "Ice Cream Toppings", "Modifier": "Rainbow Sprinkles", "Qty Sold": "2", "Gross Sales": "$0.00"},
+        ])
+        try:
+            result = take_modifiers(path)
+            self.assertNotIn("Whipped Cream", result)
+            self.assertNotIn("Rainbow Sprinkles", result)
         finally:
             os.unlink(path)
 
@@ -705,6 +737,8 @@ class CallSheetsAlignmentTests(unittest.TestCase):
             LOCATION_SPECIFIC_ITEM_STANDS[("BOTTLED_DRINKS", "Mt. Dew")],
             {"Bevelhymer Green", "Bevelhymer Yellow"},
         )
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["Brats"], {"NWSC"})
+        self.assertEqual(LOCATION_SPECIFIC_ITEM_STANDS["Hamburgers"], {"NWSC"})
 
 
 class ComboBreakdownTests(unittest.TestCase):
@@ -828,6 +862,8 @@ class NewItemsInventoryTests(unittest.TestCase):
 
     def test_food_has_new_items(self):
         self.assertIn("Chicken Caesar Salad", FOOD)
+        self.assertIn("Brats", FOOD)
+        self.assertIn("Hamburgers", FOOD)
         self.assertNotIn("Hummus and Pita Chips", FOOD)
 
     def test_snacks_has_new_items(self):

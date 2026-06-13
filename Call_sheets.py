@@ -624,6 +624,92 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
 
     return deliveries
 
+
+def read_transfers(sheet, spreadsheet_id, week_start_date=None, week_end_date=None):
+    """Read Master Transfers tab and return grouped in/out transfer totals.
+
+    Returns:
+        {
+            "to":   {stand_name: {item_name: qty}},
+            "from": {stand_name: {item_name: qty}},
+        }
+
+    Qty is computed as: individuals + (cases * qty_per_case).
+    """
+    tab = "Master Transfers"
+    try:
+        header_rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A1:G1")
+    except Exception:
+        return {"to": {}, "from": {}}
+    headers = [h.strip().lower() for h in (header_rows[0] if header_rows else [])]
+
+    def _col_idx(candidates, default):
+        for i, h in enumerate(headers):
+            if h in candidates:
+                return i
+        return default
+
+    from_idx = _col_idx({"from stand", "from"}, 1)
+    to_idx = _col_idx({"to stand", "to"}, 2)
+    item_idx = _col_idx({"item", "item name"}, 3)
+    individuals_idx = _col_idx({"individuals", "individual", "units", "qty", "quantity"}, 4)
+    cases_idx = _col_idx({"cases", "case", "packages"}, 5)
+    qty_per_case_idx = _col_idx({"qty per case", "quantity per case", "units per case"}, 6)
+
+    try:
+        raw_rows = get_values(sheet, spreadsheet_id, f"'{tab}'!A2:G1000")
+    except Exception:
+        return {"to": {}, "from": {}}
+    filter_by_date = week_start_date is not None and week_end_date is not None
+
+    transfers = {"to": {}, "from": {}}
+
+    def _to_number(value, default=0.0):
+        try:
+            return float(str(value).strip()) if str(value).strip() else default
+        except (TypeError, ValueError):
+            return default
+
+    def _add(direction, stand, item, qty):
+        if stand not in transfers[direction]:
+            transfers[direction][stand] = {}
+        transfers[direction][stand][item] = transfers[direction][stand].get(item, 0) + qty
+
+    for row in raw_rows:
+        if len(row) <= item_idx:
+            continue
+
+        if filter_by_date:
+            date_str = row[0].strip() if row and row[0] else ""
+            if not date_str:
+                continue
+            transfer_date = _parse_delivery_date(date_str)
+            if transfer_date is None:
+                continue
+            if not (week_start_date <= transfer_date <= week_end_date):
+                continue
+
+        from_stand = row[from_idx].strip() if len(row) > from_idx and row[from_idx] else ""
+        to_stand = row[to_idx].strip() if len(row) > to_idx and row[to_idx] else ""
+        item = row[item_idx].strip() if row[item_idx] else ""
+        if not from_stand or not to_stand or not item:
+            continue
+
+        individuals = _to_number(row[individuals_idx] if len(row) > individuals_idx else "")
+        cases = _to_number(row[cases_idx] if len(row) > cases_idx else "")
+        qty_per_case = _to_number(row[qty_per_case_idx] if len(row) > qty_per_case_idx else "")
+        if qty_per_case == 0:
+            qty_per_case = QUANTITY_PER_CASE.get(item, 0) or 0
+        qty = individuals + (cases * qty_per_case)
+        if qty == 0:
+            continue
+
+        _add("from", from_stand, item, qty)
+        _add("to", to_stand, item, qty)
+
+    return transfers
+
+
 def read_spoilage(sheet, spreadsheet_id, stand_name):
     """Read the Spoilage-{stand} tab and return accumulated spoilage per item.
 
@@ -1614,6 +1700,8 @@ FOOD = [
     "Chicken Salad",
     "Chicken Caesar Salad",
     "Hot Dog",
+    "Brats",
+    "Hamburgers",
     "Chili Sauce (cans)",
     "Pulled Pork (bags)",
     "Uncrustable",
@@ -1879,6 +1967,8 @@ QUANTITY_PER_CASE = {
     "Chicken Salad": 1,
     "Chicken Caesar Salad": 1,
     "Hot Dog": 50,
+    "Brats": 50,
+    "Hamburgers": 40,
     "Chili Sauce (cans)": 1,
     "Pulled Pork (bags)": 1,
     "Uncrustable": 24,
@@ -2061,6 +2151,8 @@ LOCATION_SPECIFIC_ITEM_STANDS = {
     "Iced Coffee - Vanilla": BLOOM_POP_STANDS,
     "Iced Coffee - Mocha": BLOOM_POP_STANDS,
     "Iced Coffee - Caramel": BLOOM_POP_STANDS,
+    "Brats": {"NWSC"},
+    "Hamburgers": {"NWSC"},
     ("BOTTLED_DRINKS", "Diet Mt. Dew"): SODA_CAN_STANDS,
     ("BOTTLED_DRINKS", "Mt. Dew"): SODA_CAN_STANDS,
     ("BOTTLED_DRINKS", "Squirt"): SODA_CAN_STANDS,
@@ -2337,6 +2429,7 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     # Build the ItemMatcher and helpers now that rows has all canonical items.
     # ============================
     week_label = datetime.today().strftime("Week of %m-%d-%Y")
+    week_start_date, week_end_date = extract_week_dates_from_label(week_label)
     audit_logger = AuditLogger(stand_name)
     validator    = DataValidator()
     category_map = CategoryAwareItemMatcher.build_category_map(CATEGORY_ORDER)
@@ -2394,6 +2487,35 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     audit_logger.log_starting_inventory(last_week_actuals, unmatched_starting)
 
     # ============================
+    # MASTER TRANSFERS INTEGRATION
+    # TO stand quantities are treated as deliveries.
+    # FROM stand quantities are removed from starting inventory.
+    # ============================
+    transfer_totals = read_transfers(
+        sheet,
+        spreadsheet_id,
+        week_start_date=week_start_date,
+        week_end_date=week_end_date,
+    )
+    unmatched_transfer_out = []
+    for transfer_item, qty in transfer_totals.get("from", {}).get(stand_name, {}).items():
+        matched = item_matcher.find_match(transfer_item)
+        if matched and matched in rows:
+            rows[matched]["starting"] = rows[matched].get("starting", 0) - qty
+        else:
+            unmatched_transfer_out.append(transfer_item)
+    audit_logger.log_unmatched_items("transfers_from", unmatched_transfer_out)
+
+    unmatched_transfer_in = []
+    for transfer_item, qty in transfer_totals.get("to", {}).get(stand_name, {}).items():
+        matched = item_matcher.find_match(transfer_item)
+        if matched and matched in rows:
+            rows[matched]["deliveries"] = rows[matched].get("deliveries", 0) + qty
+        else:
+            unmatched_transfer_in.append(transfer_item)
+    audit_logger.log_unmatched_items("transfers_to", unmatched_transfer_in)
+
+    # ============================
     # SPOILAGE INTEGRATION
     # Backup is logged BEFORE clearing so data is never silently lost on crash.
     # Fuzzy matching prevents silent data loss when staff misspells item names.
@@ -2418,7 +2540,6 @@ def write_full_week(sheet, service, spreadsheet_id, stand_name, rows):
     # DELIVERIES INTEGRATION (date-filtered, accumulated)
     # Fuzzy matching prevents silent data loss when staff misspells item names.
     # ============================
-    week_start_date, week_end_date = extract_week_dates_from_label(week_label)
     delivery_totals = read_deliveries(
         sheet, spreadsheet_id, stand_name,
         week_start_date=week_start_date,
