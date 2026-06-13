@@ -1,7 +1,8 @@
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build # type: ignore
+from config import config
 
-SPREADSHEET_ID = "YOUR_SHEET_ID"
+SPREADSHEET_ID = config.SPREADSHEET_ID
 DELIVERIES_RANGE = "Deliveries!A:C"  # Date, Item, Quantity
 
 def load_deliveries():
