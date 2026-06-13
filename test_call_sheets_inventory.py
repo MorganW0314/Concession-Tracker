@@ -668,6 +668,11 @@ class InventoryRefactorTests(unittest.TestCase):
             reed_cheese = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
         self.assertEqual(reed_cheese["Cheese"], Call_sheets.CHEESE_SLICES_PER_PACKAGE)
 
+        nacho_rows = [["05-10-2026", "Nacho Cheese", "4", "1"]]
+        with patch.object(Call_sheets, "get_values", side_effect=[header, nacho_rows]):
+            nacho = Call_sheets.read_deliveries(object(), "sid", "REED ROAD")
+        self.assertEqual(nacho["Nacho Cheese"], 4)
+
     def test_qty_per_case_value_for_root_beer_uses_physical_bag_units(self):
         self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "PTAC"), 1)
         self.assertEqual(Call_sheets._qty_per_case_value("Root Beer", "NWSC"), 1)

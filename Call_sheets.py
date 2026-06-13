@@ -605,8 +605,8 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
             qty = packages * GRANOLA_BARS_PER_BOX
             print(f"  [Deliveries] '{item}': {packages} box(es) → {qty} bars")
         elif is_nacho_cheese:
-            qty = packages * NACHO_CHEESE_OZ_PER_BAG
-            print(f"  [Deliveries] '{item}': {packages} bag(s) → {qty} oz nacho cheese")
+            qty = packages
+            print(f"  [Deliveries] '{item}': {packages} bag(s) → {qty} bag(s) nacho cheese")
         elif is_chicken_salad:
             qty = packages * CHICKEN_SALAD_SCOOPS_PER_TUB
             print(f"  [Deliveries] '{item}': {packages} tub(s) → {qty} scoops chicken salad")
