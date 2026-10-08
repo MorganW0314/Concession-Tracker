@@ -524,7 +524,7 @@ def read_deliveries(sheet, spreadsheet_id, stand_name, week_start_date=None, wee
     units_idx = _col_idx({"units per package", "units per", "units_per_package", "units/pkg", "units/package"}, 3)
 
     # --- Read data rows ---
-    range_str = f"'{tab}'!A2:E200"
+    range_str = f"'{tab}'!A2:E1000"
     raw_rows = get_values(sheet, spreadsheet_id, range_str)
 
     # --- Duplicate detection ---
@@ -1952,9 +1952,9 @@ QUANTITY_PER_CASE = {
     "Gatorade - Red": 8,
     "Gatorade - Blue": 8,
     "Gatorade - Yellow": 8,
-    "Bloom Pop - Strawberry Cream": 14,
-    "Bloom Pop - Raspberry Lemonade": 14,
-    "Bloom Pop - Watermelon Lime": 14,
+    "Bloom Pop - Strawberry Cream": 12,
+    "Bloom Pop - Raspberry Lemonade": 12,
+    "Bloom Pop - Watermelon Lime": 12,
     "Fairlife": 12,
     "Iced Coffee - Vanilla": 12,
     "Iced Coffee - Mocha": 12,
@@ -2006,7 +2006,7 @@ QUANTITY_PER_CASE = {
     "Ice Cream Cones": 600,
     "Tofts cups  (by sleeve)": 50,
     "Ketchup (decimal estimate)" :1000,
-    "Mustard (decimal estimate)": 1000,
+    "Mustard (decimal estimate)": 500,
     "Forks": 600,
     "Spoons": 600,
     "Knives": 600,

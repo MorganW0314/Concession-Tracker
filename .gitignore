@@ -1,9 +1,11 @@
-__pycache__/
+_pycache__/
 *.pyc
 *.pyo
 *.pyd
 .env
-
-# Runtime log files (directory structure kept via logs/.gitkeep)
+.env.*
+*.json
 logs/*.log
 logs/*.jsonl
+Credentials*.json
+google-credentials*.json

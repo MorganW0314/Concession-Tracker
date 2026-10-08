@@ -6,11 +6,11 @@ import traceback
 import tkinter as tk
 from tkinter import ttk, font as tkfont
 
-from Take_items import take_items, take_modifiers   # your CSV ingestion functions
+from Take_items import take_items, take_modifiers
 from Call_sheets import write_full_week, sync_stand_item_list, merge_modifier_rows
 from config import config
 from email_summary import send_summary_email
-from googleapiclient.discovery import build # type: ignore
+from googleapiclient.discovery import build  # type: ignore
 from google.oauth2.service_account import Credentials
 
 # ------------------------------------------------------------
@@ -18,8 +18,13 @@ from google.oauth2.service_account import Credentials
 # ------------------------------------------------------------
 SPREADSHEET_ID = config.SPREADSHEET_ID
 
-CREDENTIALS_PATH = r"C:\Users\willi\OneDrive\Desktop\inventory_Script\Credentials-personal.json"
-
+CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv(
+    "CONCESSION_CREDENTIALS_PATH"
+)
+if not CREDENTIALS_PATH:
+    raise ValueError(
+        "Google service account credentials are not configured. Set GOOGLE_APPLICATION_CREDENTIALS or CONCESSION_CREDENTIALS_PATH."
+    )
 # ------------------------------------------------------------
 # STANDS
 # ------------------------------------------------------------
